@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 /* Layout */
 import Layout from '@/layout/index.vue';
+import readerAdminRoutes from './modules/reader-admin';
 
 /**
  * Note: 路由配置项
@@ -92,7 +93,10 @@ export const constantRoutes: RouteRecordRaw[] = [
 ];
 
 // 动态路由，基于用户权限动态去加载
-export const dynamicRoutes: RouteRecordRaw[] = [];
+export const dynamicRoutes: RouteRecordRaw[] = [
+  ...readerAdminRoutes
+  // 这里后续仍会叠加后端菜单动态路由
+];
 
 /**
  * 创建路由
