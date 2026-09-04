@@ -217,3 +217,168 @@ export interface ReaderFeedbackStatusForm {
   /** 目标状态。 */
   status: string;
 }
+
+export interface ReaderSourceSite extends BaseEntity {
+  id: string | number;
+  siteName: string;
+  baseUrl: string;
+  allowedHost: string;
+  authorizationNote?: string;
+  complianceStatus: 'UNCONFIRMED' | 'APPROVED' | 'REJECTED' | string;
+  complianceCheckedAt?: string;
+  complianceCheckedBy?: string | number;
+  status: string;
+  defaultPolicyId?: string | number;
+  remark?: string;
+}
+
+export interface ReaderSourceSiteForm {
+  id?: string | number;
+  siteName: string;
+  baseUrl: string;
+  allowedHost?: string;
+  authorizationNote?: string;
+  defaultPolicyId?: string | number;
+  remark?: string;
+}
+
+export interface ReaderSourcePolicy extends BaseEntity {
+  id: string | number;
+  policyName: string;
+  concurrencyLimit: number;
+  minDelayMs: number;
+  maxDelayMs: number;
+  requestsPerMinute: number;
+  dailyRequestLimit: number;
+  connectTimeoutMs: number;
+  readTimeoutMs: number;
+  maxRetries: number;
+  circuitBreakerThreshold: number;
+  honorRetryAfter: string;
+  status: string;
+  remark?: string;
+}
+
+export interface ReaderSourcePolicyForm {
+  id?: string | number;
+  policyName: string;
+  concurrencyLimit: number;
+  minDelayMs: number;
+  maxDelayMs: number;
+  requestsPerMinute: number;
+  dailyRequestLimit: number;
+  connectTimeoutMs: number;
+  readTimeoutMs: number;
+  maxRetries: number;
+  circuitBreakerThreshold: number;
+  honorRetryAfter: string;
+  remark?: string;
+}
+
+export interface ReaderSourceRule extends BaseEntity {
+  id: string | number;
+  siteId: string | number;
+  ruleName: string;
+  versionNo: number;
+  status: string;
+  searchUrlTemplate?: string;
+  detailUrlTemplate?: string;
+  catalogUrlTemplate?: string;
+  chapterUrlTemplate?: string;
+  selectorJson: string;
+  testUrl?: string;
+  remark?: string;
+}
+
+export interface ReaderSourceRuleForm {
+  id?: string | number;
+  siteId: string | number;
+  ruleName: string;
+  searchUrlTemplate?: string;
+  detailUrlTemplate?: string;
+  catalogUrlTemplate?: string;
+  chapterUrlTemplate?: string;
+  selectorJson: string;
+  testUrl?: string;
+  remark?: string;
+}
+
+export interface ReaderSourceTask extends BaseEntity {
+  id: string | number;
+  taskName: string;
+  siteId: string | number;
+  ruleId: string | number;
+  policyId: string | number;
+  executorType: 'JAVA' | 'PYTHON' | 'GO' | string;
+  sourceWorkUrl: string;
+  sourceWorkTitle?: string;
+  startChapterNo?: number;
+  endChapterNo?: number;
+  incremental: string;
+  status: string;
+  currentChapterNo?: number;
+  plannedChapterCount?: number;
+  lastRunAt?: string;
+  failReason?: string;
+}
+
+export interface ReaderSourceTaskForm {
+  id?: string | number;
+  taskName: string;
+  siteId?: string | number;
+  ruleId?: string | number;
+  policyId?: string | number;
+  executorType: 'JAVA' | 'PYTHON' | 'GO';
+  sourceWorkUrl: string;
+  sourceWorkTitle?: string;
+  startChapterNo?: number;
+  endChapterNo?: number;
+  incremental: string;
+}
+
+export interface ReaderSourceTaskRun {
+  id: string | number;
+  taskId: string | number;
+  executorType: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  heartbeatAt?: string;
+  requestCount: number;
+  successCount: number;
+  skippedCount: number;
+  failureCount: number;
+  tooManyRequestsCount: number;
+  circuitOpen: string;
+  errorMessage?: string;
+  resultSummary?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface ReaderSourceChapterSnapshot {
+  id: string | number;
+  taskId: string | number;
+  sourceChapterId: string;
+  sourceUrl: string;
+  chapterNo?: number;
+  chapterName?: string;
+  contentHash: string;
+  titleHash?: string;
+  content?: string;
+  snapshotStatus: string;
+  capturedAt?: string;
+}
+
+export interface ReaderSourceError {
+  id: string | number;
+  taskId: string | number;
+  runId?: string | number;
+  errorType: string;
+  httpStatus?: number;
+  sourceUrl?: string;
+  message: string;
+  retryAt?: string;
+  resolved: string;
+  createTime?: string;
+}

@@ -21,7 +21,16 @@ import type {
   ReaderNovelChapterAdminVO,
   ReaderWorkAdminQuery,
   ReaderWorkAdminVO,
-  ReaderWorkDetailAdminVO
+  ReaderWorkDetailAdminVO,
+  ReaderSourceSite,
+  ReaderSourceSiteForm,
+  ReaderSourcePolicy,
+  ReaderSourcePolicyForm,
+  ReaderSourceRule,
+  ReaderSourceRuleForm,
+  ReaderSourceTask,
+  ReaderSourceTaskForm,
+  ReaderSourceTaskRun
 } from './types';
 // 分页壳类型复用平台通用定义，避免各业务模块重复声明。
 import type { PageResult } from '@/api/types';
@@ -130,3 +139,72 @@ export const updateReaderFeedbackStatus = (feedbackId: string | number, data: Re
     data
   });
 };
+
+export const listReaderSourceSites = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceSite>> =>
+  request({ url: '/reader/admin/source/sites/list', method: 'get', params: query });
+
+export const createReaderSourceSite = (data: ReaderSourceSiteForm) =>
+  request({ url: '/reader/admin/source/sites', method: 'post', data });
+
+export const updateReaderSourceSite = (id: string | number, data: ReaderSourceSiteForm) =>
+  request({ url: `/reader/admin/source/sites/${id}`, method: 'put', data });
+
+export const checkReaderSourceCompliance = (id: string | number, data: { approved: boolean; authorizationNote?: string }) =>
+  request({ url: `/reader/admin/source/sites/${id}/check-compliance`, method: 'post', data });
+
+export const enableReaderSourceSite = (id: string | number) =>
+  request({ url: `/reader/admin/source/sites/${id}/enable`, method: 'post' });
+
+export const disableReaderSourceSite = (id: string | number) =>
+  request({ url: `/reader/admin/source/sites/${id}/disable`, method: 'post' });
+
+export const listReaderSourcePolicies = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourcePolicy>> =>
+  request({ url: '/reader/admin/source/policies/list', method: 'get', params: query });
+
+export const createReaderSourcePolicy = (data: ReaderSourcePolicyForm) =>
+  request({ url: '/reader/admin/source/policies', method: 'post', data });
+
+export const updateReaderSourcePolicy = (id: string | number, data: ReaderSourcePolicyForm) =>
+  request({ url: `/reader/admin/source/policies/${id}`, method: 'put', data });
+
+export const listReaderSourceRules = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceRule>> =>
+  request({ url: '/reader/admin/source/rules/list', method: 'get', params: query });
+
+export const createReaderSourceRule = (data: ReaderSourceRuleForm) =>
+  request({ url: '/reader/admin/source/rules', method: 'post', data });
+
+export const updateReaderSourceRule = (id: string | number, data: ReaderSourceRuleForm) =>
+  request({ url: `/reader/admin/source/rules/${id}`, method: 'put', data });
+
+export const publishReaderSourceRule = (id: string | number) =>
+  request({ url: `/reader/admin/source/rules/${id}/publish`, method: 'post' });
+
+export const disableReaderSourceRule = (id: string | number) =>
+  request({ url: `/reader/admin/source/rules/${id}/disable`, method: 'post' });
+
+export const listReaderSourceTasks = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTask>> =>
+  request({ url: '/reader/admin/source/tasks/list', method: 'get', params: query });
+
+export const createReaderSourceTask = (data: ReaderSourceTaskForm) =>
+  request({ url: '/reader/admin/source/tasks', method: 'post', data });
+
+export const startReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/start`, method: 'post' });
+
+export const pauseReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/pause`, method: 'post' });
+
+export const resumeReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/resume`, method: 'post' });
+
+export const cancelReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/cancel`, method: 'post' });
+
+export const listReaderSourceTaskRuns = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTaskRun>> =>
+  request({ url: `/reader/admin/source/tasks/${id}/runs`, method: 'get', params: query });
+
+export const listReaderSourceTaskDiffs = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceChapterSnapshot>> =>
+  request({ url: `/reader/admin/source/tasks/${id}/diffs`, method: 'get', params: query });
+
+export const listReaderSourceTaskErrors = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceError>> =>
+  request({ url: `/reader/admin/source/tasks/${id}/errors`, method: 'get', params: query });

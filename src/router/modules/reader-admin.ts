@@ -11,7 +11,7 @@ const readerAdminRoutes: RouteRecordRaw[] = [
     name: 'ReaderAdmin',
     redirect: '/reader-admin/work',
     // 本地补充路由会先经过权限过滤，目录节点需要挂一组可命中的权限才能被真正注入。
-    permissions: ['reader:work:list', 'reader:import-task:list', 'reader:audit:list', 'reader:feedback:list', 'reader:publish-log:list'],
+    permissions: ['reader:work:list', 'reader:import-task:list', 'reader:audit:list', 'reader:feedback:list', 'reader:publish-log:list', 'reader:source:list'],
     alwaysShow: true,
     meta: { title: '阅读器管理', icon: 'document' },
     children: [
@@ -51,6 +51,13 @@ const readerAdminRoutes: RouteRecordRaw[] = [
         name: 'ReaderAdminPublishLog',
         component: () => import('@/views/reader-admin/publish-log/index.vue'),
         meta: { title: '发布说明', icon: 'clock' }
+      },
+      {
+        path: 'source-center',
+        name: 'ReaderAdminSourceCenter',
+        component: () => import('@/views/reader-admin/source-center/index.vue'),
+        permissions: ['reader:source:list'],
+        meta: { title: '书源采集中心', icon: 'connection' }
       }
     ]
   }
