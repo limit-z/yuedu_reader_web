@@ -30,7 +30,15 @@ import type {
   ReaderSourceRuleForm,
   ReaderSourceTask,
   ReaderSourceTaskForm,
-  ReaderSourceTaskRun
+  ReaderSourceTaskRun,
+  ReaderSourceChapterSnapshot,
+  ReaderSourceError,
+  ReaderSourceDiscoveryProvider,
+  ReaderSourceDiscoveryProviderForm,
+  ReaderSourceDiscoveryBlacklist,
+  ReaderSourceDiscoveryBlacklistForm,
+  ReaderSourceDiscoveryCandidate,
+  ReaderSourceDiscoveryRun
 } from './types';
 // 分页壳类型复用平台通用定义，避免各业务模块重复声明。
 import type { PageResult } from '@/api/types';
@@ -208,3 +216,54 @@ export const listReaderSourceTaskDiffs = (id: string | number, query: Record<str
 
 export const listReaderSourceTaskErrors = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceError>> =>
   request({ url: `/reader/admin/source/tasks/${id}/errors`, method: 'get', params: query });
+
+export const listReaderSourceDiscoveryProviders = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryProvider>> =>
+  request({ url: '/reader/admin/source-discovery/providers', method: 'get', params: query });
+
+export const createReaderSourceDiscoveryProvider = (data: ReaderSourceDiscoveryProviderForm) =>
+  request({ url: '/reader/admin/source-discovery/providers', method: 'post', data });
+
+export const updateReaderSourceDiscoveryProvider = (id: string | number, data: ReaderSourceDiscoveryProviderForm) =>
+  request({ url: `/reader/admin/source-discovery/providers/${id}`, method: 'put', data });
+
+export const runReaderSourceDiscoveryProvider = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/providers/${id}/run`, method: 'post' });
+
+export const enableReaderSourceDiscoveryProvider = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/providers/${id}/enable`, method: 'post' });
+
+export const disableReaderSourceDiscoveryProvider = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/providers/${id}/disable`, method: 'post' });
+
+export const listReaderSourceDiscoveryBlacklist = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryBlacklist>> =>
+  request({ url: '/reader/admin/source-discovery/blacklist', method: 'get', params: query });
+
+export const createReaderSourceDiscoveryBlacklist = (data: ReaderSourceDiscoveryBlacklistForm) =>
+  request({ url: '/reader/admin/source-discovery/blacklist', method: 'post', data });
+
+export const updateReaderSourceDiscoveryBlacklist = (id: string | number, data: ReaderSourceDiscoveryBlacklistForm) =>
+  request({ url: `/reader/admin/source-discovery/blacklist/${id}`, method: 'put', data });
+
+export const deleteReaderSourceDiscoveryBlacklist = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/blacklist/${id}`, method: 'delete' });
+
+export const enableReaderSourceDiscoveryBlacklist = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/blacklist/${id}/enable`, method: 'post' });
+
+export const disableReaderSourceDiscoveryBlacklist = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/blacklist/${id}/disable`, method: 'post' });
+
+export const listReaderSourceDiscoveryCandidates = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryCandidate>> =>
+  request({ url: '/reader/admin/source-discovery/candidates', method: 'get', params: query });
+
+export const checkReaderSourceDiscoveryCandidate = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/candidates/${id}/check`, method: 'post' });
+
+export const approveReaderSourceDiscoveryCandidate = (id: string | number) =>
+  request({ url: `/reader/admin/source-discovery/candidates/${id}/approve`, method: 'post' });
+
+export const rejectReaderSourceDiscoveryCandidate = (id: string | number, reason?: string) =>
+  request({ url: `/reader/admin/source-discovery/candidates/${id}/reject`, method: 'post', params: { reason } });
+
+export const listReaderSourceDiscoveryRuns = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryRun>> =>
+  request({ url: '/reader/admin/source-discovery/runs', method: 'get', params: query });

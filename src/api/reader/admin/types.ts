@@ -382,3 +382,80 @@ export interface ReaderSourceError {
   resolved: string;
   createTime?: string;
 }
+
+export interface ReaderSourceDiscoveryProvider {
+  id: string | number;
+  providerName: string;
+  providerUrl: string;
+  providerType: 'TEXT' | 'JSON' | 'RSS' | string;
+  authorizationNote: string;
+  pollIntervalSeconds: number;
+  requestIntervalMs: number;
+  maxCandidates: number;
+  status: string;
+  lastRunAt?: string;
+  nextRunAt?: string;
+  lastRunStatus?: string;
+  lastError?: string;
+}
+
+export interface ReaderSourceDiscoveryProviderForm {
+  id?: string | number;
+  providerName: string;
+  providerUrl: string;
+  providerType: 'TEXT' | 'JSON' | 'RSS';
+  authorizationNote: string;
+  pollIntervalSeconds: number;
+  requestIntervalMs: number;
+  maxCandidates: number;
+}
+
+export interface ReaderSourceDiscoveryBlacklist {
+  id: string | number;
+  matcherType: 'HOST' | 'SUFFIX' | 'URL' | string;
+  matcherValue: string;
+  reason: string;
+  source?: string;
+  status: string;
+}
+
+export interface ReaderSourceDiscoveryBlacklistForm {
+  id?: string | number;
+  matcherType: 'HOST' | 'SUFFIX' | 'URL';
+  matcherValue: string;
+  reason: string;
+  source?: string;
+}
+
+export interface ReaderSourceDiscoveryCandidate {
+  id: string | number;
+  providerId: string | number;
+  candidateUrl: string;
+  candidateHost: string;
+  candidateName?: string;
+  discoveryStatus: string;
+  blacklistStatus: string;
+  robotsStatus: string;
+  availabilityStatus: string;
+  httpStatus?: number;
+  checkMessage?: string;
+  lastCheckedAt?: string;
+  reviewedBy?: string | number;
+  reviewedAt?: string;
+  siteId?: string | number;
+}
+
+export interface ReaderSourceDiscoveryRun {
+  id: string | number;
+  providerId: string | number;
+  runToken?: string;
+  status: string;
+  startedAt?: string;
+  finishedAt?: string;
+  candidateCount: number;
+  blockedCount: number;
+  robotsDeniedCount: number;
+  availableCount: number;
+  failedCount: number;
+  errorMessage?: string;
+}

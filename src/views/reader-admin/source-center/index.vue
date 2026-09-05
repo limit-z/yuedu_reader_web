@@ -23,6 +23,51 @@
       </template>
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane label="自动发现" name="discovery">
+          <el-alert
+            title="自动发现只读取已配置的公开索引或授权 Feed"
+            description="系统会先拦截黑名单和内网地址，再检查 robots.txt 与基础连通性；候选必须人工审核后才能进入书源站点。不会扫描搜索引擎或随机探测互联网。"
+            type="warning"
+            show-icon
+            :closable="false"
+            class="mb-4"
+          />
+          <el-tabs v-model="discoveryTab" @tab-change="handleDiscoveryTabChange">
+            <el-tab-pane label="发现源" name="providers">
+              <div class="toolbar-row">
+                <el-form :inline="true" :model="providerQuery" @submit.prevent>
+                  <el-form-item label="发现源名称"><el-input v-model="providerQuery.providerName" clearable placeholder="搜索发现源" @keyup.enter="loadDiscoveryProviders" /></el-form-item>
+                  <el-form-item label="状态"><el-select v-model="providerQuery.status" clearable placeholder="全部" style="width: 120px"><el-option label="启用" value="1" /><el-option label="停用" value="0" /></el-select></el-form-item>
+                  <el-button type="primary" icon="Search" @click="loadDiscoveryProviders">查询</el-button>
+                </el-form>
+                <el-button type="primary" icon="Plus" @click="openProviderDialog()">新增发现源</el-button>
+              </div>
+              <el-table v-loading="loading.discoveryProviders" :data="discoveryProviders" border>
+                <el-table-column label="发现源" min-width="220"><template #default="{ row }"><div class="primary-text">{{ row.providerName }}</div><div class="muted-text">{{ row.providerType }} · {{ row.providerUrl }}</div></template></el-table-column>
+                <el-table-column label="授权说明" min-width="200" prop="authorizationNote" show-overflow-tooltip />
+                <el-table-column label="轮询/间隔" width="150"><template #default="{ row }">{{ row.pollIntervalSeconds }}秒 / {{ row.requestIntervalMs }}ms</template></el-table-column>
+                <el-table-column label="最近运行" width="150"><template #default="{ row }"><el-tag :type="providerRunTag(row.lastRunStatus)">{{ providerRunLabel(row.lastRunStatus) }}</el-tag><div class="muted-text">{{ row.lastRunAt || '尚未运行' }}</div></template></el-table-column>
+                <el-table-column label="状态" width="80"><template #default="{ row }"><el-tag :type="row.status === '1' ? 'success' : 'info'">{{ row.status === '1' ? '启用' : '停用' }}</el-tag></template></el-table-column>
+                <el-table-column label="操作" fixed="right" width="240" align="center"><template #default="{ row }"><el-button link type="primary" @click="openProviderDialog(row)">编辑</el-button><el-button link type="success" :disabled="row.status !== '1'" @click="runDiscoveryProvider(row)">立即运行</el-button><el-button v-if="row.status !== '1'" link type="success" @click="toggleDiscoveryProvider(row, true)">启用</el-button><el-button v-else link type="danger" @click="toggleDiscoveryProvider(row, false)">停用</el-button></template></el-table-column>
+              </el-table>
+              <pagination v-show="providerTotal > 0" v-model:page="providerQuery.pageNum" v-model:limit="providerQuery.pageSize" :total="providerTotal" @pagination="loadDiscoveryProviders" />
+            </el-tab-pane>
+            <el-tab-pane label="黑名单" name="blacklist">
+              <div class="toolbar-row"><el-form :inline="true" :model="blacklistQuery" @submit.prevent><el-form-item label="匹配类型"><el-select v-model="blacklistQuery.matcherType" clearable placeholder="全部" style="width: 120px"><el-option label="精确主机" value="HOST" /><el-option label="域名后缀" value="SUFFIX" /><el-option label="精确地址" value="URL" /></el-select></el-form-item><el-button type="primary" icon="Search" @click="loadDiscoveryBlacklist">查询</el-button></el-form><el-button type="primary" icon="Plus" @click="openBlacklistDialog()">新增黑名单</el-button></div>
+              <el-table v-loading="loading.discoveryBlacklist" :data="discoveryBlacklist" border><el-table-column label="匹配类型" width="110"><template #default="{ row }">{{ matcherTypeLabel(row.matcherType) }}</template></el-table-column><el-table-column label="匹配值" min-width="260" prop="matcherValue" show-overflow-tooltip /><el-table-column label="原因" min-width="220" prop="reason" show-overflow-tooltip /><el-table-column label="来源" width="140" prop="source" /><el-table-column label="状态" width="80"><template #default="{ row }"><el-tag :type="row.status === '1' ? 'danger' : 'info'">{{ row.status === '1' ? '拦截中' : '停用' }}</el-tag></template></el-table-column><el-table-column label="操作" fixed="right" width="210" align="center"><template #default="{ row }"><el-button link type="primary" @click="openBlacklistDialog(row)">编辑</el-button><el-button v-if="row.status === '1'" link type="warning" @click="toggleBlacklist(row, false)">停用</el-button><el-button v-else link type="success" @click="toggleBlacklist(row, true)">启用</el-button><el-button link type="danger" @click="removeBlacklist(row)">删除</el-button></template></el-table-column></el-table>
+              <pagination v-show="blacklistTotal > 0" v-model:page="blacklistQuery.pageNum" v-model:limit="blacklistQuery.pageSize" :total="blacklistTotal" @pagination="loadDiscoveryBlacklist" />
+            </el-tab-pane>
+            <el-tab-pane label="候选审核" name="candidates">
+              <div class="toolbar-row"><el-form :inline="true" :model="candidateQuery" @submit.prevent><el-form-item label="审核状态"><el-select v-model="candidateQuery.discoveryStatus" clearable placeholder="全部" style="width: 140px"><el-option label="待审核" value="NEEDS_REVIEW" /><el-option label="已拦截" value="BLOCKED" /><el-option label="检查失败" value="CHECK_FAILED" /><el-option label="已通过" value="APPROVED" /><el-option label="已拒绝" value="REJECTED" /></el-select></el-form-item><el-form-item label="关键词"><el-input v-model="candidateQuery.keyword" clearable placeholder="地址或主机" @keyup.enter="loadDiscoveryCandidates" /></el-form-item><el-button type="primary" icon="Search" @click="loadDiscoveryCandidates">查询</el-button></el-form></div>
+              <el-table v-loading="loading.discoveryCandidates" :data="discoveryCandidates" border><el-table-column label="候选地址" min-width="280"><template #default="{ row }"><div class="primary-text">{{ row.candidateName || row.candidateHost }}</div><div class="muted-text">{{ row.candidateUrl }}</div></template></el-table-column><el-table-column label="黑名单" width="90"><template #default="{ row }"><el-tag :type="row.blacklistStatus === 'MATCHED' ? 'danger' : 'success'">{{ row.blacklistStatus === 'MATCHED' ? '已命中' : '未命中' }}</el-tag></template></el-table-column><el-table-column label="robots" width="110"><template #default="{ row }"><el-tag :type="robotsTag(row.robotsStatus)">{{ robotsLabel(row.robotsStatus) }}</el-tag></template></el-table-column><el-table-column label="可用性" width="100"><template #default="{ row }"><el-tag :type="row.availabilityStatus === 'AVAILABLE' ? 'success' : 'info'">{{ row.availabilityStatus === 'AVAILABLE' ? '可访问' : '未通过' }}</el-tag></template></el-table-column><el-table-column label="审核状态" width="100"><template #default="{ row }"><el-tag :type="candidateTag(row.discoveryStatus)">{{ candidateLabel(row.discoveryStatus) }}</el-tag></template></el-table-column><el-table-column label="检查摘要" min-width="220" prop="checkMessage" show-overflow-tooltip /><el-table-column label="操作" fixed="right" width="220" align="center"><template #default="{ row }"><el-button v-if="!['APPROVED', 'REJECTED', 'BLOCKED'].includes(row.discoveryStatus)" link type="primary" @click="checkDiscoveryCandidate(row)">重新检查</el-button><el-button v-if="row.discoveryStatus === 'NEEDS_REVIEW'" link type="success" @click="approveDiscoveryCandidate(row)">审核通过</el-button><el-button v-if="!['APPROVED', 'REJECTED'].includes(row.discoveryStatus)" link type="danger" @click="rejectDiscoveryCandidate(row)">拒绝</el-button></template></el-table-column></el-table>
+              <pagination v-show="candidateTotal > 0" v-model:page="candidateQuery.pageNum" v-model:limit="candidateQuery.pageSize" :total="candidateTotal" @pagination="loadDiscoveryCandidates" />
+            </el-tab-pane>
+            <el-tab-pane label="运行记录" name="discovery-runs">
+              <el-table v-loading="loading.discoveryRuns" :data="discoveryRuns" border><el-table-column label="运行ID" prop="id" width="90" /><el-table-column label="发现源ID" prop="providerId" width="100" /><el-table-column label="状态" width="100"><template #default="{ row }"><el-tag :type="row.status === 'COMPLETED' ? 'success' : row.status === 'FAILED' ? 'danger' : 'info'">{{ row.status }}</el-tag></template></el-table-column><el-table-column label="候选/拦截/可用/失败" min-width="170"><template #default="{ row }">{{ row.candidateCount }} / {{ row.blockedCount }} / {{ row.availableCount }} / {{ row.failedCount }}</template></el-table-column><el-table-column label="robots拒绝" width="100" prop="robotsDeniedCount" /><el-table-column label="开始时间" width="170" prop="startedAt" /><el-table-column label="错误摘要" min-width="220" prop="errorMessage" show-overflow-tooltip /></el-table>
+              <pagination v-show="discoveryRunTotal > 0" v-model:page="discoveryRunQuery.pageNum" v-model:limit="discoveryRunQuery.pageSize" :total="discoveryRunTotal" @pagination="loadDiscoveryRuns" />
+            </el-tab-pane>
+          </el-tabs>
+        </el-tab-pane>
         <el-tab-pane label="书源站点" name="sites">
           <div class="toolbar-row">
             <el-form :inline="true" :model="siteQuery" @submit.prevent>
@@ -143,6 +188,30 @@
       </el-tabs>
     </el-card>
 
+    <el-dialog v-model="providerDialog.visible" :title="providerDialog.editing ? '编辑发现源' : '新增发现源'" width="650px" append-to-body>
+      <el-alert title="请填写你有权使用的公开索引、订阅 Feed 或授权目录，不要填写搜索引擎结果页或未知站点地址。" type="info" :closable="false" class="mb-4" />
+      <el-form label-width="125px">
+        <el-form-item label="发现源名称"><el-input v-model="providerDialog.form.providerName" maxlength="128" /></el-form-item>
+        <el-form-item label="Feed 地址"><el-input v-model="providerDialog.form.providerUrl" placeholder="https://example.org/public-sources.txt" /></el-form-item>
+        <el-form-item label="内容类型"><el-select v-model="providerDialog.form.providerType" style="width: 180px"><el-option label="纯文本" value="TEXT" /><el-option label="JSON" value="JSON" /><el-option label="RSS/XML" value="RSS" /></el-select></el-form-item>
+        <el-row :gutter="16"><el-col :span="12"><el-form-item label="轮询间隔(秒)"><el-input-number v-model="providerDialog.form.pollIntervalSeconds" :min="900" :max="604800" /></el-form-item></el-col><el-col :span="12"><el-form-item label="检查间隔(ms)"><el-input-number v-model="providerDialog.form.requestIntervalMs" :min="1000" :max="600000" /></el-form-item></el-col></el-row>
+        <el-form-item label="单次候选上限"><el-input-number v-model="providerDialog.form.maxCandidates" :min="1" :max="100" /></el-form-item>
+        <el-form-item label="授权说明"><el-input v-model="providerDialog.form.authorizationNote" type="textarea" :rows="4" maxlength="1000" show-word-limit /></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="providerDialog.visible = false">取消</el-button><el-button type="primary" :loading="submitting" @click="submitProvider">保存</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="blacklistDialog.visible" :title="blacklistDialog.editing ? '编辑黑名单' : '新增黑名单'" width="560px" append-to-body>
+      <el-alert title="黑名单命中后不会访问对应地址。域名后缀匹配会覆盖该域名及其子域名。" type="warning" :closable="false" class="mb-4" />
+      <el-form label-width="110px">
+        <el-form-item label="匹配类型"><el-select v-model="blacklistDialog.form.matcherType" style="width: 180px"><el-option label="精确主机" value="HOST" /><el-option label="域名后缀" value="SUFFIX" /><el-option label="精确地址" value="URL" /></el-select></el-form-item>
+        <el-form-item label="匹配值"><el-input v-model="blacklistDialog.form.matcherValue" placeholder="例如 official.example.com" /></el-form-item>
+        <el-form-item label="拦截原因"><el-input v-model="blacklistDialog.form.reason" type="textarea" :rows="3" maxlength="500" /></el-form-item>
+        <el-form-item label="来源"><el-input v-model="blacklistDialog.form.source" maxlength="128" placeholder="例如 官方网站、版权方通知" /></el-form-item>
+      </el-form>
+      <template #footer><el-button @click="blacklistDialog.visible = false">取消</el-button><el-button type="primary" :loading="submitting" @click="submitBlacklist">保存</el-button></template>
+    </el-dialog>
+
     <el-dialog v-model="siteDialog.visible" :title="siteDialog.editing ? '编辑书源站点' : '新增书源站点'" width="560px" append-to-body>
       <el-form ref="siteFormRef" :model="siteDialog.form" :rules="siteRules" label-width="105px">
         <el-form-item label="站点名称" prop="siteName"><el-input v-model="siteDialog.form.siteName" maxlength="128" /></el-form-item>
@@ -250,6 +319,15 @@ import {
   createReaderSourceRule,
   createReaderSourceSite,
   createReaderSourceTask,
+  createReaderSourceDiscoveryBlacklist,
+  createReaderSourceDiscoveryProvider,
+  approveReaderSourceDiscoveryCandidate,
+  checkReaderSourceDiscoveryCandidate,
+  deleteReaderSourceDiscoveryBlacklist,
+  disableReaderSourceDiscoveryBlacklist,
+  disableReaderSourceDiscoveryProvider,
+  enableReaderSourceDiscoveryBlacklist,
+  enableReaderSourceDiscoveryProvider,
   disableReaderSourceSite,
   disableReaderSourceRule,
   enableReaderSourceSite,
@@ -260,13 +338,21 @@ import {
   listReaderSourceTaskErrors,
   listReaderSourceTaskRuns,
   listReaderSourceTasks,
+  listReaderSourceDiscoveryBlacklist,
+  listReaderSourceDiscoveryCandidates,
+  listReaderSourceDiscoveryProviders,
+  listReaderSourceDiscoveryRuns,
   pauseReaderSourceTask,
   publishReaderSourceRule,
+  rejectReaderSourceDiscoveryCandidate,
   resumeReaderSourceTask,
   startReaderSourceTask,
+  runReaderSourceDiscoveryProvider,
   updateReaderSourcePolicy,
   updateReaderSourceRule,
-  updateReaderSourceSite
+  updateReaderSourceSite,
+  updateReaderSourceDiscoveryBlacklist,
+  updateReaderSourceDiscoveryProvider
 } from '@/api/reader/admin';
 import type {
   ReaderSourcePolicy,
@@ -279,14 +365,21 @@ import type {
   ReaderSourceTaskForm,
   ReaderSourceTaskRun,
   ReaderSourceChapterSnapshot,
-  ReaderSourceError
+  ReaderSourceError,
+  ReaderSourceDiscoveryProvider,
+  ReaderSourceDiscoveryProviderForm,
+  ReaderSourceDiscoveryBlacklist,
+  ReaderSourceDiscoveryBlacklistForm,
+  ReaderSourceDiscoveryCandidate,
+  ReaderSourceDiscoveryRun
 } from '@/api/reader/admin/types';
 
 defineOptions({ name: 'ReaderAdminSourceCenterPage' });
 
 const activeTab = ref('sites');
+const discoveryTab = ref('providers');
 const submitting = ref(false);
-const loading = reactive({ sites: false, policies: false, rules: false, tasks: false, runs: false, diffs: false, errors: false });
+const loading = reactive({ sites: false, policies: false, rules: false, tasks: false, runs: false, diffs: false, errors: false, discoveryProviders: false, discoveryBlacklist: false, discoveryCandidates: false, discoveryRuns: false });
 const sites = ref<ReaderSourceSite[]>([]);
 const policies = ref<ReaderSourcePolicy[]>([]);
 const rules = ref<ReaderSourceRule[]>([]);
@@ -294,6 +387,10 @@ const tasks = ref<ReaderSourceTask[]>([]);
 const runs = ref<ReaderSourceTaskRun[]>([]);
 const snapshots = ref<ReaderSourceChapterSnapshot[]>([]);
 const errors = ref<ReaderSourceError[]>([]);
+const discoveryProviders = ref<ReaderSourceDiscoveryProvider[]>([]);
+const discoveryBlacklist = ref<ReaderSourceDiscoveryBlacklist[]>([]);
+const discoveryCandidates = ref<ReaderSourceDiscoveryCandidate[]>([]);
+const discoveryRuns = ref<ReaderSourceDiscoveryRun[]>([]);
 const siteTotal = ref(0);
 const policyTotal = ref(0);
 const ruleTotal = ref(0);
@@ -301,6 +398,10 @@ const taskTotal = ref(0);
 const runTotal = ref(0);
 const snapshotTotal = ref(0);
 const errorTotal = ref(0);
+const providerTotal = ref(0);
+const blacklistTotal = ref(0);
+const candidateTotal = ref(0);
+const discoveryRunTotal = ref(0);
 const siteQuery = reactive({ pageNum: 1, pageSize: 10, siteName: '', complianceStatus: '' });
 const policyQuery = reactive({ pageNum: 1, pageSize: 10, policyName: '' });
 const ruleQuery = reactive<{ pageNum: number; pageSize: number; siteId?: string | number; status: string }>({ pageNum: 1, pageSize: 10, siteId: undefined, status: '' });
@@ -308,15 +409,23 @@ const taskQuery = reactive({ pageNum: 1, pageSize: 10, taskName: '', status: '' 
 const runQuery = reactive({ pageNum: 1, pageSize: 10 });
 const diffQuery = reactive({ pageNum: 1, pageSize: 10 });
 const errorQuery = reactive({ pageNum: 1, pageSize: 10 });
+const providerQuery = reactive({ pageNum: 1, pageSize: 10, providerName: '', status: '' });
+const blacklistQuery = reactive({ pageNum: 1, pageSize: 10, matcherType: '' });
+const candidateQuery = reactive({ pageNum: 1, pageSize: 10, discoveryStatus: '', candidateHost: '', keyword: '' });
+const discoveryRunQuery = reactive({ pageNum: 1, pageSize: 10, providerId: undefined as string | number | undefined });
 
 const blankSite = (): ReaderSourceSiteForm => ({ siteName: '', baseUrl: '', allowedHost: '', authorizationNote: '', defaultPolicyId: undefined, remark: '' });
 const blankPolicy = (): ReaderSourcePolicyForm => ({ policyName: '', concurrencyLimit: 1, minDelayMs: 3000, maxDelayMs: 8000, requestsPerMinute: 10, dailyRequestLimit: 1000, connectTimeoutMs: 10000, readTimeoutMs: 20000, maxRetries: 2, circuitBreakerThreshold: 5, honorRetryAfter: '1', remark: '' });
 const blankRule = (): ReaderSourceRuleForm => ({ siteId: '', ruleName: '', catalogUrlTemplate: '', chapterUrlTemplate: '', selectorJson: '{\n  "catalog": { "item": ".chapter-item", "title": ".chapter-title" },\n  "chapter": { "title": "h1", "content": ".content" }\n}', testUrl: '', remark: '' });
 const blankTask = (): ReaderSourceTaskForm => ({ taskName: '', siteId: undefined, ruleId: undefined, policyId: undefined, executorType: 'JAVA', sourceWorkUrl: '', sourceWorkTitle: '', startChapterNo: 1, endChapterNo: undefined, incremental: '1' });
+const blankProvider = (): ReaderSourceDiscoveryProviderForm => ({ providerName: '', providerUrl: '', providerType: 'TEXT', authorizationNote: '', pollIntervalSeconds: 3600, requestIntervalMs: 3000, maxCandidates: 20 });
+const blankBlacklist = (): ReaderSourceDiscoveryBlacklistForm => ({ matcherType: 'HOST', matcherValue: '', reason: '', source: '' });
 const siteDialog = reactive({ visible: false, editing: false, form: blankSite() });
 const policyDialog = reactive({ visible: false, editing: false, form: blankPolicy() });
 const ruleDialog = reactive({ visible: false, editing: false, form: blankRule() });
 const taskDialog = reactive({ visible: false, form: blankTask() });
+const providerDialog = reactive({ visible: false, editing: false, form: blankProvider() });
+const blacklistDialog = reactive({ visible: false, editing: false, form: blankBlacklist() });
 const complianceDialog = reactive<{ visible: boolean; approved: boolean; note: string; site?: ReaderSourceSite }>({ visible: false, approved: true, note: '', site: undefined });
 const runsDialog = reactive<{ visible: boolean; tab: string; task?: ReaderSourceTask }>({ visible: false, tab: 'runs', task: undefined });
 const siteFormRef = ref<FormInstance>();
@@ -340,13 +449,20 @@ const loadTasks = async () => { loading.tasks = true; try { const { data } = awa
 const loadRuns = async () => { if (!runsDialog.task) return; loading.runs = true; try { const { data } = await listReaderSourceTaskRuns(runsDialog.task.id, runQuery); const result = unwrap(data); runs.value = result.rows; runTotal.value = result.total; } finally { loading.runs = false; } };
 const loadDiffs = async () => { if (!runsDialog.task) return; loading.diffs = true; try { const { data } = await listReaderSourceTaskDiffs(runsDialog.task.id, diffQuery); const result = unwrap(data); snapshots.value = result.rows; snapshotTotal.value = result.total; } finally { loading.diffs = false; } };
 const loadErrors = async () => { if (!runsDialog.task) return; loading.errors = true; try { const { data } = await listReaderSourceTaskErrors(runsDialog.task.id, errorQuery); const result = unwrap(data); errors.value = result.rows; errorTotal.value = result.total; } finally { loading.errors = false; } };
-const handleTabChange = (name: string | number) => { if (name === 'policies' && !policies.value.length) loadPolicies(); if (name === 'rules') loadRules(); if (name === 'tasks') loadTasks(); };
+const loadDiscoveryProviders = async () => { loading.discoveryProviders = true; try { const { data } = await listReaderSourceDiscoveryProviders(providerQuery); const result = unwrap(data); discoveryProviders.value = result.rows; providerTotal.value = result.total; } finally { loading.discoveryProviders = false; } };
+const loadDiscoveryBlacklist = async () => { loading.discoveryBlacklist = true; try { const { data } = await listReaderSourceDiscoveryBlacklist(blacklistQuery); const result = unwrap(data); discoveryBlacklist.value = result.rows; blacklistTotal.value = result.total; } finally { loading.discoveryBlacklist = false; } };
+const loadDiscoveryCandidates = async () => { loading.discoveryCandidates = true; try { const { data } = await listReaderSourceDiscoveryCandidates(candidateQuery); const result = unwrap(data); discoveryCandidates.value = result.rows; candidateTotal.value = result.total; } finally { loading.discoveryCandidates = false; } };
+const loadDiscoveryRuns = async () => { loading.discoveryRuns = true; try { const { data } = await listReaderSourceDiscoveryRuns(discoveryRunQuery); const result = unwrap(data); discoveryRuns.value = result.rows; discoveryRunTotal.value = result.total; } finally { loading.discoveryRuns = false; } };
+const handleTabChange = (name: string | number) => { if (name === 'discovery') loadDiscoveryProviders(); if (name === 'policies' && !policies.value.length) loadPolicies(); if (name === 'rules') loadRules(); if (name === 'tasks') loadTasks(); };
+const handleDiscoveryTabChange = (name: string | number) => { if (name === 'providers') loadDiscoveryProviders(); if (name === 'blacklist') loadDiscoveryBlacklist(); if (name === 'candidates') loadDiscoveryCandidates(); if (name === 'discovery-runs') loadDiscoveryRuns(); };
 const resetSiteQuery = () => { siteQuery.pageNum = 1; siteQuery.siteName = ''; siteQuery.complianceStatus = ''; loadSites(); };
 
 const openSiteDialog = (row?: ReaderSourceSite) => { siteDialog.editing = !!row; siteDialog.form = row ? { ...row } : blankSite(); siteDialog.visible = true; };
 const openPolicyDialog = (row?: ReaderSourcePolicy) => { policyDialog.editing = !!row; policyDialog.form = row ? { ...row } : blankPolicy(); policyDialog.visible = true; };
 const openRuleDialog = (row?: ReaderSourceRule) => { ruleDialog.editing = !!row; ruleDialog.form = row ? { ...row } : blankRule(); ruleDialog.visible = true; };
 const openTaskDialog = () => { taskDialog.form = blankTask(); taskRulesOptions.value = []; taskDialog.visible = true; };
+const openProviderDialog = (row?: ReaderSourceDiscoveryProvider) => { providerDialog.editing = !!row; providerDialog.form = row ? { ...row } : blankProvider(); providerDialog.visible = true; };
+const openBlacklistDialog = (row?: ReaderSourceDiscoveryBlacklist) => { blacklistDialog.editing = !!row; blacklistDialog.form = row ? { ...row } : blankBlacklist(); blacklistDialog.visible = true; };
 const openComplianceDialog = (site: ReaderSourceSite) => { complianceDialog.site = site; complianceDialog.approved = site.complianceStatus !== 'REJECTED'; complianceDialog.note = site.authorizationNote || ''; complianceDialog.visible = true; };
 const openRuns = (task: ReaderSourceTask) => { runsDialog.task = task; runsDialog.tab = 'runs'; runQuery.pageNum = 1; runsDialog.visible = true; loadRuns(); };
 const openDiffs = (task: ReaderSourceTask) => { runsDialog.task = task; runsDialog.tab = 'diffs'; diffQuery.pageNum = 1; runsDialog.visible = true; loadDiffs(); };
@@ -357,9 +473,18 @@ const submitPolicy = async () => { if (!(await policyFormRef.value?.validate()))
 const submitRule = async () => { if (!(await ruleFormRef.value?.validate())) return; submitting.value = true; try { if (ruleDialog.editing && ruleDialog.form.id) await updateReaderSourceRule(ruleDialog.form.id, ruleDialog.form); else await createReaderSourceRule(ruleDialog.form); ElMessage.success('解析规则已保存为草稿'); ruleDialog.visible = false; await loadRules(); } finally { submitting.value = false; } };
 const submitCompliance = async () => { if (!complianceDialog.site) return; submitting.value = true; try { await checkReaderSourceCompliance(complianceDialog.site.id, { approved: complianceDialog.approved, authorizationNote: complianceDialog.note }); ElMessage.success('合规确认已记录'); complianceDialog.visible = false; await loadSites(); } finally { submitting.value = false; } };
 const submitTask = async () => { if (!(await taskFormRef.value?.validate())) return; submitting.value = true; try { await createReaderSourceTask(taskDialog.form); ElMessage.success('采集任务已创建，请从任务列表启动'); taskDialog.visible = false; activeTab.value = 'tasks'; await loadTasks(); } finally { submitting.value = false; } };
+const submitProvider = async () => { if (!providerDialog.form.providerName || !providerDialog.form.providerUrl || !providerDialog.form.authorizationNote) { ElMessage.warning('发现源名称、地址和授权说明不能为空'); return; } submitting.value = true; try { if (providerDialog.editing && providerDialog.form.id) await updateReaderSourceDiscoveryProvider(providerDialog.form.id, providerDialog.form); else await createReaderSourceDiscoveryProvider(providerDialog.form); ElMessage.success('发现源已保存，启用后会按轮询时间自动运行'); providerDialog.visible = false; await loadDiscoveryProviders(); } finally { submitting.value = false; } };
+const submitBlacklist = async () => { if (!blacklistDialog.form.matcherValue || !blacklistDialog.form.reason) { ElMessage.warning('匹配值和拦截原因不能为空'); return; } submitting.value = true; try { if (blacklistDialog.editing && blacklistDialog.form.id) await updateReaderSourceDiscoveryBlacklist(blacklistDialog.form.id, blacklistDialog.form); else await createReaderSourceDiscoveryBlacklist(blacklistDialog.form); ElMessage.success('黑名单已保存，后续发现请求会优先拦截'); blacklistDialog.visible = false; await loadDiscoveryBlacklist(); } finally { submitting.value = false; } };
 const toggleSite = async (row: ReaderSourceSite, enabled: boolean) => { await (enabled ? enableReaderSourceSite(row.id) : disableReaderSourceSite(row.id)); ElMessage.success(enabled ? '站点已启用' : '站点已停用'); loadSites(); };
 const toggleRule = async (row: ReaderSourceRule, enabled: boolean) => { await (enabled ? publishReaderSourceRule(row.id) : disableReaderSourceRule(row.id)); ElMessage.success(enabled ? '解析规则已发布' : '解析规则已停用'); loadRules(); };
 const operateTask = async (row: ReaderSourceTask, action: 'start' | 'pause' | 'resume' | 'cancel') => { await ElMessageBox.confirm(`确认${action === 'start' ? '启动' : action === 'pause' ? '暂停' : action === 'resume' ? '恢复' : '取消'}任务“${row.taskName}”吗？`, '任务操作', { type: action === 'cancel' ? 'warning' : 'info' }); if (action === 'start') await startReaderSourceTask(row.id); if (action === 'pause') await pauseReaderSourceTask(row.id); if (action === 'resume') await resumeReaderSourceTask(row.id); if (action === 'cancel') await cancelReaderSourceTask(row.id); ElMessage.success('任务状态已更新'); loadTasks(); };
+const runDiscoveryProvider = async (row: ReaderSourceDiscoveryProvider) => { await ElMessageBox.confirm('运行会读取配置的公开 Feed，并按间隔检查新候选地址，是否继续？', '运行发现源', { type: 'warning' }); submitting.value = true; try { await runReaderSourceDiscoveryProvider(row.id); ElMessage.success('发现源运行完成，候选已进入审核列表'); await Promise.all([loadDiscoveryProviders(), loadDiscoveryCandidates()]); } finally { submitting.value = false; } };
+const toggleDiscoveryProvider = async (row: ReaderSourceDiscoveryProvider, enabled: boolean) => { await (enabled ? enableReaderSourceDiscoveryProvider(row.id) : disableReaderSourceDiscoveryProvider(row.id)); ElMessage.success(enabled ? '发现源已启用' : '发现源已停用'); await loadDiscoveryProviders(); };
+const toggleBlacklist = async (row: ReaderSourceDiscoveryBlacklist, enabled: boolean) => { await (enabled ? enableReaderSourceDiscoveryBlacklist(row.id) : disableReaderSourceDiscoveryBlacklist(row.id)); ElMessage.success(enabled ? '黑名单已启用' : '黑名单已停用'); await loadDiscoveryBlacklist(); };
+const removeBlacklist = async (row: ReaderSourceDiscoveryBlacklist) => { await ElMessageBox.confirm(`确认删除黑名单“${row.matcherValue}”吗？`, '删除确认', { type: 'warning' }); await deleteReaderSourceDiscoveryBlacklist(row.id); ElMessage.success('黑名单已删除'); await loadDiscoveryBlacklist(); };
+const checkDiscoveryCandidate = async (row: ReaderSourceDiscoveryCandidate) => { submitting.value = true; try { await checkReaderSourceDiscoveryCandidate(row.id); ElMessage.success('候选地址检查完成'); await loadDiscoveryCandidates(); } finally { submitting.value = false; } };
+const approveDiscoveryCandidate = async (row: ReaderSourceDiscoveryCandidate) => { await ElMessageBox.confirm('审核通过后会生成一个停用的正式书源站点，仍需完成授权确认、解析规则和限流策略配置，是否继续？', '候选审核', { type: 'warning' }); await approveReaderSourceDiscoveryCandidate(row.id); ElMessage.success('候选已通过，正式站点仍处于停用状态'); await Promise.all([loadDiscoveryCandidates(), loadSites()]); };
+const rejectDiscoveryCandidate = async (row: ReaderSourceDiscoveryCandidate) => { const result = await ElMessageBox.prompt('请输入拒绝原因', '拒绝候选地址', { inputValue: '未通过人工审核', inputValidator: value => !!value?.trim() || '请输入拒绝原因' }); await rejectReaderSourceDiscoveryCandidate(row.id, result.value); ElMessage.success('候选已拒绝'); await loadDiscoveryCandidates(); };
 const handleTaskSiteChange = async (siteId?: string | number) => { taskDialog.form.ruleId = undefined; taskRulesOptions.value = []; if (siteId) { const { data } = await listReaderSourceRules({ siteId, status: '1', pageNum: 1, pageSize: 100 }); taskRulesOptions.value = data?.rows ?? []; } };
 
 const complianceLabel = (value: string) => value === 'APPROVED' ? '已确认' : value === 'REJECTED' ? '不允许' : '未确认';
@@ -368,8 +493,15 @@ const ruleLabel = (value: string) => value === '1' ? '启用' : value === '2' ? 
 const ruleTag = (value: string) => value === '1' ? 'success' : value === '2' ? 'info' : 'warning';
 const taskLabel = (value: string) => taskStatuses.find(item => item.value === value)?.label || value;
 const taskTag = (value: string) => ['RUNNING', 'WAITING_REVIEW'].includes(value) ? 'warning' : ['COMPLETED'].includes(value) ? 'success' : ['FAILED', 'CANCELED'].includes(value) ? 'danger' : 'info';
+const providerRunLabel = (value?: string) => value === 'COMPLETED' ? '已完成' : value === 'FAILED' ? '失败' : value === 'RUNNING' ? '运行中' : '未运行';
+const providerRunTag = (value?: string) => value === 'COMPLETED' ? 'success' : value === 'FAILED' ? 'danger' : value === 'RUNNING' ? 'warning' : 'info';
+const matcherTypeLabel = (value: string) => value === 'HOST' ? '精确主机' : value === 'SUFFIX' ? '域名后缀' : '精确地址';
+const robotsLabel = (value: string) => value === 'ALLOWED' ? '允许' : value === 'DISALLOWED' ? '已拒绝' : value === 'UNAVAILABLE' ? '无法检查' : '未检查';
+const robotsTag = (value: string) => value === 'ALLOWED' ? 'success' : value === 'DISALLOWED' ? 'danger' : 'warning';
+const candidateLabel = (value: string) => value === 'NEEDS_REVIEW' ? '待审核' : value === 'BLOCKED' ? '已拦截' : value === 'CHECK_FAILED' ? '检查失败' : value === 'APPROVED' ? '已通过' : value === 'REJECTED' ? '已拒绝' : value;
+const candidateTag = (value: string) => value === 'NEEDS_REVIEW' ? 'warning' : value === 'APPROVED' ? 'success' : value === 'BLOCKED' || value === 'REJECTED' ? 'danger' : 'info';
 
-onMounted(async () => { await Promise.all([loadSites(), loadPolicies()]); });
+onMounted(async () => { await Promise.all([loadSites(), loadPolicies(), loadDiscoveryProviders()]); });
 </script>
 
 <style scoped lang="scss">
