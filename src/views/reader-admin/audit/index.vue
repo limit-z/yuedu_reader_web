@@ -34,13 +34,16 @@
             <p class="m-0 mt-1 text-sm text-[var(--el-text-color-secondary)]">当前共 {{ total }} 条记录。</p>
           </div>
           <right-toolbar v-model:show-search="showSearch" :search="false" @query-table="getList" />
+          <el-button type="success" :disabled="!selectedAudits.length" @click="handleBatchApprove">批量通过</el-button>
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="auditList" border>
+      <el-table v-loading="loading" :data="auditList" border @selection-change="value => selectedAudits = value">
+        <el-table-column type="selection" width="48" />
         <el-table-column label="审核ID" prop="id" width="100" />
         <el-table-column label="作品ID" prop="workId" width="100" />
         <el-table-column label="作品标题" prop="workTitle" min-width="220" show-overflow-tooltip />
+        <el-table-column label="来源任务" width="120"><template #default="{ row }">{{ row.sourceTaskId ? `#${row.sourceTaskId}` : '-' }}</template></el-table-column>
         <el-table-column label="审核状态" prop="auditStatus" width="140">
           <template #default="{ row }">
             <el-tag :type="getAuditStatusType(row.auditStatus)">{{ row.auditStatus }}</el-tag>
@@ -50,14 +53,10 @@
         <el-table-column label="创建时间" prop="createTime" min-width="180" />
         <el-table-column label="操作" fixed="right" width="120" align="center">
           <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              :disabled="row.auditStatus === 'APPROVED'"
-              @click="handleApprove(row as ReaderAuditRecordVO)"
-            >
+            <el-button v-if="row.auditStatus !== 'APPROVED'" link type="primary" @click="handleApprove(row as ReaderAuditRecordVO)">
               通过
             </el-button>
+            <el-tag v-else type="success" effect="plain">已通过</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -78,7 +77,7 @@
 // 表单实例类型用于筛选条件重置。
 import type { FormInstance } from 'element-plus';
 // 审核列表与审核通过动作统一复用后台 API 封装。
-import { approveReaderAudit, listReaderAuditRecords } from '@/api/reader/admin';
+import { approveReaderAudit, batchApproveReaderAudits, listReaderAuditRecords } from '@/api/reader/admin';
 // 审核查询参数与列表结构使用共享类型，避免页面写死状态字段。
 import type { ReaderAuditRecordQuery, ReaderAuditRecordVO } from '@/api/reader/admin/types';
 
@@ -89,6 +88,7 @@ const loading = ref(false);
 const showSearch = ref(true);
 const total = ref(0);
 const auditList = ref<ReaderAuditRecordVO[]>([]);
+const selectedAudits = ref<ReaderAuditRecordVO[]>([]);
 const queryParams = reactive<ReaderAuditRecordQuery>({
   pageNum: 1,
   pageSize: 10,
@@ -135,6 +135,15 @@ const handleApprove = async (row: ReaderAuditRecordVO) => {
   await approveReaderAudit(row.id);
   ElMessage.success('审核已通过');
   getList();
+};
+
+const handleBatchApprove = async () => {
+  if (!selectedAudits.value.length) return ElMessage.warning('请先选择审核记录');
+  await ElMessageBox.confirm(`确认批量通过选中的 ${selectedAudits.value.length} 条审核记录吗？`, '批量审核确认', { type: 'warning' });
+  const { data } = await batchApproveReaderAudits(selectedAudits.value.map(row => row.id));
+  ElMessage.success(`批量审核完成，成功 ${data?.successCount ?? 0} 条，失败 ${data?.failureCount ?? 0} 条`);
+  await getList();
+  selectedAudits.value = [];
 };
 
 // 页面初始化时拉取一次待审记录，方便运营直接进入审核工作台。

@@ -18,6 +18,16 @@ export interface ReaderWorkAdminVO extends BaseEntity {
   intro?: string;
   /** 封面地址。 */
   coverUrl?: string;
+  /** 横版封面地址。 */
+  coverLandscapeUrl?: string;
+  /** 封面背景模式：GLOBAL、COLOR、IMAGE。 */
+  coverBackgroundMode?: ReaderCoverMode;
+  /** 作品级封面背景色。 */
+  coverBackgroundColor?: string;
+  /** 作品级封面背景图片 OSS ID。 */
+  coverBackgroundOssId?: string | number;
+  /** 自动封面缓存版本。 */
+  coverRevision?: number;
   /** 连载状态。 */
   serialStatus?: string;
   /** 是否允许被搜索。 */
@@ -39,6 +49,60 @@ export interface ReaderWorkAdminQuery extends PageQuery {
   publishStatus?: string;
   /** 来源类型。 */
   sourceType?: string;
+}
+
+export type ReaderCoverMode = 'GLOBAL' | 'COLOR' | 'IMAGE';
+
+export interface ReaderCoverPresetVO {
+  key: string;
+  name: string;
+  color: string;
+}
+
+export interface ReaderCoverStyleVO {
+  mode: ReaderCoverMode;
+  color?: string;
+  backgroundOssId?: string | number;
+  backgroundImageUrl?: string;
+  presets: ReaderCoverPresetVO[];
+}
+
+export interface ReaderCoverStyleForm {
+  mode: ReaderCoverMode;
+  color?: string;
+  backgroundOssId?: string | number;
+}
+
+export interface ReaderCoverCandidateAdminVO {
+  id: string | number;
+  orientation: 'PORTRAIT' | 'LANDSCAPE';
+  sourceProvider: string;
+  sourceQuery: string;
+  sourcePageUrl?: string;
+  sourceImageUrl?: string;
+  uploadedOssId?: string | number;
+  storedImageUrl?: string;
+  width?: number;
+  height?: number;
+  status: string;
+  failureReason?: string;
+  capturedAt?: string;
+}
+
+export interface ReaderCoverCrawlTaskAdminVO {
+  id: string | number;
+  workId: string | number;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | string;
+  portraitTargetCount: number;
+  landscapeTargetCount: number;
+  portraitSuccessCount: number;
+  landscapeSuccessCount: number;
+  currentProvider?: string;
+  progressPercent: number;
+  lastError?: string;
+  startedAt?: string;
+  finishedAt?: string;
+  candidates: ReaderCoverCandidateAdminVO[];
 }
 
 export interface ReaderImportTaskVO extends BaseEntity {
@@ -93,12 +157,48 @@ export interface ReaderAuditRecordVO extends BaseEntity {
   id: string | number;
   /** 作品ID。 */
   workId: string | number;
+  sourceTaskId?: string | number;
+  sourceTaskBookId?: string | number;
   /** 作品标题。 */
   workTitle?: string;
   /** 审核状态。 */
   auditStatus: string;
   /** 审核意见。 */
   auditComment?: string;
+}
+
+export interface ReaderWorkCategory extends BaseEntity {
+  id: string | number;
+  categoryName: string;
+  normalizedName: string;
+  sourceType: string;
+  status: string;
+}
+
+export interface ReaderRanking {
+  id: string | number;
+  rankingKey: string;
+  rankingName: string;
+  rankingDesc?: string;
+  rankingMode: 'AUTO' | 'MANUAL' | string;
+  sortRule: 'HOT' | 'RISING' | 'COMPLETED' | 'NEW' | 'UPDATE' | string;
+  sortNo: number;
+  status: string;
+}
+
+export interface ReaderRankingWork {
+  id?: string | number;
+  rankingId: string | number;
+  workId: string | number;
+  sortNo?: number;
+  status?: string;
+}
+
+export interface ReaderRankingWorkOption {
+  id: string | number;
+  title: string;
+  categoryName?: string;
+  publishStatus?: string;
 }
 
 export interface ReaderAuditRecordQuery extends PageQuery {
@@ -113,6 +213,8 @@ export interface ReaderWorkDetailAdminVO extends ReaderWorkAdminVO {
   createTime?: string;
   /** 更新时间。 */
   updateTime?: string;
+  /** 作品级背景图片的预览地址。 */
+  coverBackgroundImageUrl?: string;
 }
 
 export interface ReaderCatalogAdminVO {
@@ -315,11 +417,47 @@ export interface ReaderSourceTask extends BaseEntity {
   startChapterNo?: number;
   endChapterNo?: number;
   incremental: string;
+  /** 采集模式：SINGLE单本、ALL全站、CATEGORY按分类。 */
+  collectionMode: 'SINGLE' | 'ALL' | 'CATEGORY' | string;
+  /** 按分类采集时的来源分类。 */
+  categoryName?: string;
+  /** 批量采集最多处理的书籍数量。 */
+  bookLimit?: number;
+  /** 当前采集批次号。 */
+  batchNo?: string;
+  /** 当前批次书籍与进度统计。 */
+  totalBooks?: number;
+  processedBooks?: number;
+  successBooks?: number;
+  skippedBooks?: number;
+  failedBooks?: number;
+  progressPercent?: number;
+  /** 是否允许每日额度跨日自动重试。 */
+  dailyRetryEnabled?: string;
+  /** 因每日额度耗尽触发的累计自动重试次数。 */
+  dailyRetryCount?: number;
+  /** 最近一次自动重试日期与时间。 */
+  lastDailyRetryDate?: string;
+  lastDailyRetryAt?: string;
+  /** 最近一次失败分类和自动化续采配置。 */
+  failureCode?: string;
+  autoRetryEnabled?: string;
+  autoRetryCount?: number;
+  maxAutoRetryCount?: number;
+  retryAfter?: string;
+  parentTaskId?: string | number;
+  fallbackId?: string | number;
+  fallbackSourceTaskBookId?: string | number;
   status: string;
   currentChapterNo?: number;
   plannedChapterCount?: number;
   lastRunAt?: string;
   failReason?: string;
+  /** 最新运行记录及真实执行状态，仅用于管理端展示。 */
+  latestRunId?: string | number;
+  latestRunStatus?: string;
+  latestRunClaimedAt?: string;
+  executionState?: 'WAITING_WORKER' | 'COLLECTING' | 'WAITING_RATE_LIMIT' | 'WAITING_DAILY_LIMIT' | 'WAITING_MANUAL' | 'PAUSED' | string;
 }
 
 export interface ReaderSourceTaskForm {
@@ -334,6 +472,41 @@ export interface ReaderSourceTaskForm {
   startChapterNo?: number;
   endChapterNo?: number;
   incremental: string;
+  collectionMode: 'SINGLE' | 'ALL' | 'CATEGORY';
+  categoryName?: string;
+  /** 批量采集最多处理的书籍数量。 */
+  bookLimit?: number;
+}
+
+export interface ReaderSourceTaskBook {
+  id: string | number;
+  taskId: string | number;
+  runId?: string | number;
+  batchNo?: string;
+  sourceWorkUrl: string;
+  sourceWorkTitle: string;
+  authorName: string;
+  categoryName?: string;
+  workDedupeKey: string;
+  workId?: string | number;
+  dedupeAction: string;
+  status: string;
+  localLatestChapterNo?: number;
+  remoteLatestChapterNo?: number;
+  plannedChapterCount?: number;
+  processedChapterCount?: number;
+  successChapterCount?: number;
+  skippedChapterCount?: number;
+  failureChapterCount?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  lastError?: string;
+}
+
+export interface ReaderSourceTaskBookSnapshot extends ReaderSourceChapterSnapshot {
+  taskBookId?: string | number;
+  workId?: string | number;
+  runId?: string | number;
 }
 
 export interface ReaderSourceTaskRun {
@@ -352,8 +525,36 @@ export interface ReaderSourceTaskRun {
   circuitOpen: string;
   errorMessage?: string;
   resultSummary?: string;
+  retryNo?: number;
+  triggerType?: string;
+  triggerReason?: string;
   createTime?: string;
   updateTime?: string;
+}
+
+export interface ReaderSourceTaskFallback {
+  id?: string | number;
+  taskId: string | number;
+  priority: number;
+  siteId: string | number;
+  ruleId: string | number;
+  policyId?: string | number;
+  sourceUrlTemplate: string;
+  autoEnabled: string;
+  status: string;
+  lastChildTaskId?: string | number;
+}
+
+export interface ReaderSourceTaskLog {
+  id: string | number;
+  taskId: string | number;
+  runId?: string | number;
+  taskBookId?: string | number;
+  level: string;
+  eventType: string;
+  message: string;
+  detailJson?: string;
+  eventAt?: string;
 }
 
 export interface ReaderSourceChapterSnapshot {
@@ -381,6 +582,190 @@ export interface ReaderSourceError {
   retryAt?: string;
   resolved: string;
   createTime?: string;
+}
+
+export interface ReaderSourceDashboardCountItem {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface ReaderSourceDashboardSiteStat {
+  siteId: string | number;
+  siteName: string;
+  allowedHost?: string;
+  status: string;
+  complianceStatus: string;
+  taskCount: number;
+  runningTaskCount: number;
+  bookCount: number;
+  successChapterCount: number;
+  failedChapterCount: number;
+  requestCount: number;
+  runCount: number;
+}
+
+export interface ReaderSourceDashboardTrendStat {
+  date: string;
+  runCount: number;
+  successCount: number;
+  failureCount: number;
+  requestCount: number;
+}
+
+export interface ReaderSourceDashboardVO {
+  generatedAt?: string;
+  taskTotal: number;
+  activeTaskTotal: number;
+  runTotal: number;
+  runningRunTotal: number;
+  bookTotal: number;
+  workTotal: number;
+  chapterTotal: number;
+  contentReadyChapterTotal: number;
+  plannedChapterTotal: number;
+  processedChapterTotal: number;
+  successChapterTotal: number;
+  skippedChapterTotal: number;
+  failedChapterTotal: number;
+  pendingChapterTotal: number;
+  snapshotTotal: number;
+  errorTotal: number;
+  unresolvedErrorTotal: number;
+  taskLogTotal: number;
+  enabledSiteTotal: number;
+  approvedSiteTotal: number;
+  policyTotal: number;
+  activePolicyTotal: number;
+  ruleTotal: number;
+  activeRuleTotal: number;
+  fallbackTotal: number;
+  discoveryProviderTotal: number;
+  discoveryCandidateTotal: number;
+  coverTaskTotal: number;
+  coverCompletedTotal: number;
+  coverRunningTotal: number;
+  coverFailedTotal: number;
+  taskStatusCounts: Record<string, number>;
+  runStatusCounts: Record<string, number>;
+  bookStatusCounts: Record<string, number>;
+  failureCodeCounts: Record<string, number>;
+  errorTypeCounts: Record<string, number>;
+  executorCounts: Record<string, number>;
+  triggerCounts: Record<string, number>;
+  siteStats: ReaderSourceDashboardSiteStat[];
+  recentTrend: ReaderSourceDashboardTrendStat[];
+  recentFailures: ReaderSourceDashboardCountItem[];
+}
+
+export interface ReaderSourceDashboardWorkVO {
+  workId: string | number;
+  title: string;
+  authorName?: string;
+  categoryName?: string;
+  serialStatus?: string;
+  publishStatus?: string;
+  taskCount: number;
+  bookRecordCount: number;
+  plannedChapterCount: number;
+  processedChapterCount: number;
+  successChapterCount: number;
+  skippedChapterCount: number;
+  failedChapterCount: number;
+  chapterTotal: number;
+  contentReadyChapterCount: number;
+  contentMissingChapterCount: number;
+  currentTaskId?: string | number;
+  currentTaskName?: string;
+  currentTaskStatus?: string;
+  progressPercent: number;
+  lastActivityAt?: string;
+}
+
+export interface ReaderSourceDashboardTaskVO {
+  taskId: string | number;
+  taskName: string;
+  siteId?: string | number;
+  siteName?: string;
+  executorType?: string;
+  status: string;
+  failureCode?: string;
+  failReason?: string;
+  bookCount: number;
+  plannedChapterCount: number;
+  processedChapterCount: number;
+  successChapterCount: number;
+  skippedChapterCount: number;
+  failedChapterCount: number;
+  progressPercent: number;
+  current: boolean;
+  lastRunAt?: string;
+  lastActivityAt?: string;
+}
+
+export interface ReaderSourceDashboardChapterVO {
+  chapterId: string | number;
+  workId: string | number;
+  chapterNo?: number;
+  volumeName?: string;
+  chapterName?: string;
+  wordCount?: number;
+  publishStatus?: string;
+  contentStatus: 'READY' | 'MISSING' | string;
+  updateTime?: string;
+}
+
+export interface ReaderSourceDashboardErrorVO {
+  id: string | number;
+  taskId: string | number;
+  runId?: string | number;
+  errorType: string;
+  httpStatus?: number;
+  message: string;
+  resolved: string;
+  retryAt?: string;
+  createTime?: string;
+}
+
+export interface ReaderSourceDashboardLogVO {
+  id: string | number;
+  taskId: string | number;
+  runId?: string | number;
+  taskBookId?: string | number;
+  level: string;
+  eventType: string;
+  message: string;
+  detailJson?: string;
+  eventAt?: string;
+}
+
+export interface ReaderSourceDashboardWorkDetailVO {
+  workId: string | number;
+  title: string;
+  authorName?: string;
+  categoryName?: string;
+  serialStatus?: string;
+  publishStatus?: string;
+  currentTaskId?: string | number;
+  currentTaskName?: string;
+  currentTaskStatus?: string;
+  taskCount: number;
+  bookRecordCount: number;
+  chapterTotal: number;
+  contentReadyChapterCount: number;
+  contentMissingChapterCount: number;
+  plannedChapterCount: number;
+  processedChapterCount: number;
+  successChapterCount: number;
+  skippedChapterCount: number;
+  failedChapterCount: number;
+  progressPercent: number;
+  taskStatusCounts: Record<string, number>;
+  bookStatusCounts: Record<string, number>;
+  chapterStatusCounts: Record<string, number>;
+  tasks: ReaderSourceDashboardTaskVO[];
+  recentErrors: ReaderSourceDashboardErrorVO[];
+  recentLogs: ReaderSourceDashboardLogVO[];
 }
 
 export interface ReaderSourceDiscoveryProvider {

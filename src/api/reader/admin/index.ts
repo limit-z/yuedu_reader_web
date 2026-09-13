@@ -31,17 +31,44 @@ import type {
   ReaderSourceTask,
   ReaderSourceTaskForm,
   ReaderSourceTaskRun,
+  ReaderSourceTaskBook,
+  ReaderSourceTaskBookSnapshot,
+  ReaderSourceTaskFallback,
+  ReaderSourceTaskLog,
   ReaderSourceChapterSnapshot,
   ReaderSourceError,
+  ReaderSourceDashboardVO,
+  ReaderSourceDashboardWorkVO,
+  ReaderSourceDashboardWorkDetailVO,
+  ReaderSourceDashboardChapterVO,
   ReaderSourceDiscoveryProvider,
   ReaderSourceDiscoveryProviderForm,
   ReaderSourceDiscoveryBlacklist,
   ReaderSourceDiscoveryBlacklistForm,
   ReaderSourceDiscoveryCandidate,
-  ReaderSourceDiscoveryRun
+  ReaderSourceDiscoveryRun,
+  ReaderWorkCategory,
+  ReaderCoverStyleForm,
+  ReaderCoverStyleVO
+  ,ReaderCoverCrawlTaskAdminVO
+  ,ReaderRanking
+  ,ReaderRankingWork
+  ,ReaderRankingWorkOption
 } from './types';
 // 分页壳类型复用平台通用定义，避免各业务模块重复声明。
 import type { PageResult } from '@/api/types';
+
+export interface ReaderBatchActionFailure {
+  id: string | number;
+  reason: string;
+}
+
+export interface ReaderBatchActionResult {
+  requestedCount: number;
+  successCount: number;
+  failureCount: number;
+  failures: ReaderBatchActionFailure[];
+}
 
 export const listReaderWorks = (query: ReaderWorkAdminQuery): AxiosPromise<PageResult<ReaderWorkAdminVO>> => {
   return request({
@@ -95,6 +122,9 @@ export const createReaderImportTask = (data: ReaderImportTaskForm) => {
   });
 };
 
+export const batchReaderImportTasks = (action: 'cancel' | 'retry', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/import/tasks/batch/${action}`, method: 'post', data: ids });
+
 export const listReaderAuditRecords = (query: ReaderAuditRecordQuery): AxiosPromise<PageResult<ReaderAuditRecordVO>> => {
   return request({
     url: '/reader/admin/audits/list',
@@ -117,12 +147,36 @@ export const offlineReaderWork = (workId: string | number) => {
   });
 };
 
+export const batchReaderWorkStatus = (action: 'publish' | 'offline', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/works/batch/${action}`, method: 'post', data: ids });
+
+export const getReaderGlobalCoverStyle = (): AxiosPromise<ReaderCoverStyleVO> =>
+  request({ url: '/reader/admin/works/cover-settings', method: 'get' });
+
+export const updateReaderGlobalCoverStyle = (data: ReaderCoverStyleForm) =>
+  request({ url: '/reader/admin/works/cover-settings', method: 'put', data });
+
+export const updateReaderWorkCoverStyle = (workId: string | number, data: ReaderCoverStyleForm) =>
+  request({ url: `/reader/admin/works/${workId}/cover-settings`, method: 'put', data });
+
+export const getReaderCoverCrawlTask = (workId: string | number): AxiosPromise<ReaderCoverCrawlTaskAdminVO> =>
+  request({ url: `/reader/admin/works/${workId}/cover-crawl`, method: 'get' });
+
+export const retryReaderCoverCrawl = (workId: string | number) =>
+  request({ url: `/reader/admin/works/${workId}/cover-crawl/retry`, method: 'post' });
+
+export const reformatReaderNovelContents = () =>
+  request({ url: '/reader/admin/works/chapters/reformat', method: 'post' });
+
 export const approveReaderAudit = (auditId: string | number) => {
   return request({
     url: `/reader/admin/audits/${auditId}/approve`,
     method: 'post'
   });
 };
+
+export const batchApproveReaderAudits = (ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: '/reader/admin/audits/batch/approve', method: 'post', data: ids });
 
 export const listReaderFeedback = (query: ReaderFeedbackAdminQuery): AxiosPromise<PageResult<ReaderFeedbackAdminVO>> => {
   return request({
@@ -148,6 +202,9 @@ export const updateReaderFeedbackStatus = (feedbackId: string | number, data: Re
   });
 };
 
+export const batchUpdateReaderFeedbackStatus = (ids: Array<string | number>, status: string): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: '/reader/admin/feedback/batch/status', method: 'post', data: { ids, status } });
+
 export const listReaderSourceSites = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceSite>> =>
   request({ url: '/reader/admin/source/sites/list', method: 'get', params: query });
 
@@ -166,6 +223,9 @@ export const enableReaderSourceSite = (id: string | number) =>
 export const disableReaderSourceSite = (id: string | number) =>
   request({ url: `/reader/admin/source/sites/${id}/disable`, method: 'post' });
 
+export const batchReaderSourceSites = (action: 'enable' | 'disable', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source/sites/batch/${action}`, method: 'post', data: ids });
+
 export const listReaderSourcePolicies = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourcePolicy>> =>
   request({ url: '/reader/admin/source/policies/list', method: 'get', params: query });
 
@@ -174,6 +234,9 @@ export const createReaderSourcePolicy = (data: ReaderSourcePolicyForm) =>
 
 export const updateReaderSourcePolicy = (id: string | number, data: ReaderSourcePolicyForm) =>
   request({ url: `/reader/admin/source/policies/${id}`, method: 'put', data });
+
+export const batchReaderSourcePolicies = (action: 'enable' | 'disable', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source/policies/batch/${action}`, method: 'post', data: ids });
 
 export const listReaderSourceRules = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceRule>> =>
   request({ url: '/reader/admin/source/rules/list', method: 'get', params: query });
@@ -190,8 +253,32 @@ export const publishReaderSourceRule = (id: string | number) =>
 export const disableReaderSourceRule = (id: string | number) =>
   request({ url: `/reader/admin/source/rules/${id}/disable`, method: 'post' });
 
+export const batchReaderSourceRules = (action: 'publish' | 'disable', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source/rules/batch/${action}`, method: 'post', data: ids });
+
 export const listReaderSourceTasks = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTask>> =>
   request({ url: '/reader/admin/source/tasks/list', method: 'get', params: query });
+
+export const getReaderSourceDashboardOverview = (days = 14): AxiosPromise<ReaderSourceDashboardVO> =>
+  request({ url: '/reader/admin/source/dashboard/overview', method: 'get', params: { days } });
+
+export const listReaderSourceDashboardWorks = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDashboardWorkVO>> =>
+  request({ url: '/reader/admin/source/dashboard/works', method: 'get', params: query });
+
+export const getReaderSourceDashboardWorkDetail = (workId: string | number): AxiosPromise<ReaderSourceDashboardWorkDetailVO> =>
+  request({ url: `/reader/admin/source/dashboard/works/${workId}`, method: 'get' });
+
+export const listReaderSourceDashboardWorkChapters = (
+  workId: string | number,
+  query: Record<string, unknown>
+): AxiosPromise<PageResult<ReaderSourceDashboardChapterVO>> =>
+  request({ url: `/reader/admin/source/dashboard/works/${workId}/chapters`, method: 'get', params: query });
+
+export const getReaderSourceTask = (id: string | number): AxiosPromise<ReaderSourceTask> =>
+  request({ url: `/reader/admin/source/tasks/${id}`, method: 'get' });
+
+export const materializeReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/materialize`, method: 'post' });
 
 export const createReaderSourceTask = (data: ReaderSourceTaskForm) =>
   request({ url: '/reader/admin/source/tasks', method: 'post', data });
@@ -205,8 +292,14 @@ export const pauseReaderSourceTask = (id: string | number) =>
 export const resumeReaderSourceTask = (id: string | number) =>
   request({ url: `/reader/admin/source/tasks/${id}/resume`, method: 'post' });
 
+export const retryCircuitReaderSourceTask = (id: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${id}/retry-circuit`, method: 'post' });
+
 export const cancelReaderSourceTask = (id: string | number) =>
   request({ url: `/reader/admin/source/tasks/${id}/cancel`, method: 'post' });
+
+export const batchReaderSourceTasks = (action: 'start' | 'pause' | 'resume' | 'cancel' | 'retry-circuit', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source/tasks/batch/${action}`, method: 'post', data: ids });
 
 export const listReaderSourceTaskRuns = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTaskRun>> =>
   request({ url: `/reader/admin/source/tasks/${id}/runs`, method: 'get', params: query });
@@ -216,6 +309,30 @@ export const listReaderSourceTaskDiffs = (id: string | number, query: Record<str
 
 export const listReaderSourceTaskErrors = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceError>> =>
   request({ url: `/reader/admin/source/tasks/${id}/errors`, method: 'get', params: query });
+
+export const listReaderSourceTaskBooks = (id: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTaskBook>> =>
+  request({ url: `/reader/admin/source/tasks/${id}/books`, method: 'get', params: query });
+
+export const getReaderSourceTaskBook = (taskId: string | number, taskBookId: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/books/${taskBookId}`, method: 'get' });
+
+export const listReaderSourceTaskBookSnapshots = (taskId: string | number, taskBookId: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTaskBookSnapshot>> =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/books/${taskBookId}/snapshots`, method: 'get', params: query });
+
+export const listReaderSourceTaskFallbacks = (taskId: string | number): AxiosPromise<ReaderSourceTaskFallback[]> =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/fallbacks`, method: 'get' });
+
+export const autoProvisionReaderSourceTaskFallbacks = (taskId: string | number) =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/fallbacks/auto-provision`, method: 'post' });
+
+export const listReaderSourceTaskChildren = (taskId: string | number): AxiosPromise<ReaderSourceTask[]> =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/children`, method: 'get' });
+
+export const saveReaderSourceTaskFallback = (taskId: string | number, data: ReaderSourceTaskFallback) =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/fallbacks`, method: 'post', data });
+
+export const listReaderSourceTaskLogs = (taskId: string | number, query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceTaskLog>> =>
+  request({ url: `/reader/admin/source/tasks/${taskId}/logs`, method: 'get', params: query });
 
 export const listReaderSourceDiscoveryProviders = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryProvider>> =>
   request({ url: '/reader/admin/source-discovery/providers', method: 'get', params: query });
@@ -235,6 +352,9 @@ export const enableReaderSourceDiscoveryProvider = (id: string | number) =>
 export const disableReaderSourceDiscoveryProvider = (id: string | number) =>
   request({ url: `/reader/admin/source-discovery/providers/${id}/disable`, method: 'post' });
 
+export const batchReaderSourceDiscoveryProviders = (action: 'enable' | 'disable', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source-discovery/providers/batch/${action}`, method: 'post', data: ids });
+
 export const listReaderSourceDiscoveryBlacklist = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryBlacklist>> =>
   request({ url: '/reader/admin/source-discovery/blacklist', method: 'get', params: query });
 
@@ -253,6 +373,9 @@ export const enableReaderSourceDiscoveryBlacklist = (id: string | number) =>
 export const disableReaderSourceDiscoveryBlacklist = (id: string | number) =>
   request({ url: `/reader/admin/source-discovery/blacklist/${id}/disable`, method: 'post' });
 
+export const batchReaderSourceDiscoveryBlacklist = (action: 'enable' | 'disable' | 'delete', ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source-discovery/blacklist/batch/${action}`, method: 'post', data: ids });
+
 export const listReaderSourceDiscoveryCandidates = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryCandidate>> =>
   request({ url: '/reader/admin/source-discovery/candidates', method: 'get', params: query });
 
@@ -265,5 +388,47 @@ export const approveReaderSourceDiscoveryCandidate = (id: string | number) =>
 export const rejectReaderSourceDiscoveryCandidate = (id: string | number, reason?: string) =>
   request({ url: `/reader/admin/source-discovery/candidates/${id}/reject`, method: 'post', params: { reason } });
 
+export const batchReaderSourceDiscoveryCandidates = (action: 'check' | 'approve' | 'reject', ids: Array<string | number>, reason?: string): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/source-discovery/candidates/batch/${action}`, method: 'post', data: ids, params: { reason } });
+
 export const listReaderSourceDiscoveryRuns = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceDiscoveryRun>> =>
   request({ url: '/reader/admin/source-discovery/runs', method: 'get', params: query });
+
+export const listReaderWorkCategories = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderWorkCategory>> =>
+  request({ url: '/reader/admin/work-categories/list', method: 'get', params: query });
+
+export const createReaderWorkCategory = (data: Partial<ReaderWorkCategory>) =>
+  request({ url: '/reader/admin/work-categories', method: 'post', data });
+
+export const updateReaderWorkCategory = (id: string | number, data: Partial<ReaderWorkCategory>) =>
+  request({ url: `/reader/admin/work-categories/${id}`, method: 'put', data });
+
+export const updateReaderWorkCategoryStatus = (id: string | number, status: string) =>
+  request({ url: `/reader/admin/work-categories/${id}/status/${status}`, method: 'post' });
+
+export const batchUpdateReaderWorkCategoryStatus = (status: string, ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/work-categories/batch/status/${status}`, method: 'post', data: ids });
+
+export const listReaderRankings = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderRanking>> =>
+  request({ url: '/reader/admin/rankings/list', method: 'get', params: query });
+
+export const createReaderRanking = (data: Partial<ReaderRanking>) =>
+  request({ url: '/reader/admin/rankings', method: 'post', data });
+
+export const updateReaderRanking = (id: string | number, data: Partial<ReaderRanking>) =>
+  request({ url: `/reader/admin/rankings/${id}`, method: 'put', data });
+
+export const updateReaderRankingStatus = (id: string | number, status: string) =>
+  request({ url: `/reader/admin/rankings/${id}/status/${status}`, method: 'post' });
+
+export const batchUpdateReaderRankingStatus = (status: string, ids: Array<string | number>): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: `/reader/admin/rankings/batch/status/${status}`, method: 'post', data: ids });
+
+export const listReaderRankingWorks = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderRankingWorkOption>> =>
+  request({ url: '/reader/admin/rankings/available-works', method: 'get', params: query });
+
+export const listReaderRankingWorkRelations = (id: string | number): AxiosPromise<ReaderRankingWork[]> =>
+  request({ url: `/reader/admin/rankings/${id}/works`, method: 'get' });
+
+export const saveReaderRankingWorks = (id: string | number, workIds: Array<string | number>) =>
+  request({ url: `/reader/admin/rankings/${id}/works`, method: 'put', data: workIds });

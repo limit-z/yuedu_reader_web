@@ -7,7 +7,7 @@
             <h3 class="m-0 text-base font-semibold">导入任务</h3>
             <p class="m-0 mt-1 text-sm text-[var(--el-text-color-secondary)]">聚焦 P0 文件导入任务状态和失败原因排查。</p>
           </div>
-          <el-button type="primary" icon="Upload" @click="handleCreate">创建导入任务</el-button>
+          <div class="batch-actions"><el-button type="primary" icon="Upload" @click="handleCreate">创建导入任务</el-button><el-button :disabled="!selectedTasks.length" @click="batchImportAction('retry')">批量重试解析</el-button><el-button type="danger" plain :disabled="!selectedTasks.length" @click="batchImportAction('cancel')">批量取消</el-button></div>
         </div>
       </template>
 
@@ -41,7 +41,8 @@
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="taskList" border>
+      <el-table v-loading="loading" :data="taskList" border @selection-change="value => selectedTasks = value">
+        <el-table-column type="selection" width="48" />
         <el-table-column label="ID" prop="id" width="90" />
         <el-table-column label="任务名称" prop="taskName" min-width="220" show-overflow-tooltip />
         <el-table-column label="内容类型" prop="contentType" width="120">
@@ -134,7 +135,7 @@ import type { FormInstance } from 'element-plus';
 // 平台统一消息提示插件，负责成功反馈与错误提示展示。
 import modal from '@/plugins/modal';
 // 导入任务接口统一从阅读器后台 API 模块引入，避免页面分散拼接请求。
-import { createReaderImportTask, listReaderImportTasks } from '@/api/reader/admin';
+import { batchReaderImportTasks, createReaderImportTask, listReaderImportTasks } from '@/api/reader/admin';
 // 页面表单和列表类型与后台契约保持同步，减少字段名漂移。
 import type { ReaderImportTaskForm, ReaderImportTaskQuery, ReaderImportTaskVO } from '@/api/reader/admin/types';
 
@@ -146,6 +147,7 @@ const loading = ref(false);
 const showSearch = ref(true);
 const total = ref(0);
 const taskList = ref<ReaderImportTaskVO[]>([]);
+const selectedTasks = ref<ReaderImportTaskVO[]>([]);
 const dialogVisible = ref(false);
 const submitting = ref(false);
 const uploadValue = ref('');
@@ -174,6 +176,24 @@ const rules = {
 };
 
 const contentTypeLabel = (value?: string) => (value === 'COMIC' ? '漫画' : value === 'NOVEL' ? '小说' : value || '-');
+
+const batchImportAction = async (action: 'cancel' | 'retry') => {
+  if (!selectedTasks.value.length) return modal.msgWarning('请先选择导入任务');
+  await modal.confirm(`确认批量${action === 'cancel' ? '取消' : '重试解析'}选中的 ${selectedTasks.value.length} 个导入任务吗？`);
+  submitting.value = true;
+  try {
+    const { data } = await batchReaderImportTasks(action, selectedTasks.value.map(item => item.id));
+    const failures = data?.failures ?? [];
+    const detail = failures.slice(0, 5).map(item => `#${item.id}: ${item.reason}`).join('\n');
+    const message = `已处理 ${data?.successCount ?? 0}/${data?.requestedCount ?? 0} 条` + (failures.length ? `，失败 ${data?.failureCount ?? failures.length} 条${detail ? `\n${detail}` : ''}` : '');
+    failures.length ? modal.msgWarning(message) : modal.msgSuccess(message);
+    await getList();
+    selectedTasks.value = [];
+    startPolling();
+  } finally {
+    submitting.value = false;
+  }
+};
 
 watch(uploadValue, value => {
   // file-upload 组件返回的是 OSS 记录主键，提交任务时需要同步回表单字段。

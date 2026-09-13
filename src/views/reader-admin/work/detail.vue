@@ -165,6 +165,44 @@
       </el-col>
     </el-row>
 
+    <el-card shadow="hover" class="mb-4 reader-work-detail__cover-card">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="m-0 text-base font-semibold">封面采集</h3>
+            <p class="m-0 mt-1 text-sm text-[var(--el-text-color-secondary)]">章节全部完成后异步执行，图片保留来源地址供追溯。</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <el-tag v-if="coverTask" :type="coverTaskStatusType(coverTask.status)">{{ coverTask.status }}</el-tag>
+            <el-button v-if="coverTask" text :loading="coverLoading" @click="loadCoverCrawl">刷新</el-button>
+            <el-button v-if="coverTask?.status === 'FAILED'" type="primary" plain @click="retryCoverCrawl">重新采集</el-button>
+          </div>
+        </div>
+      </template>
+
+      <template v-if="coverTask">
+        <el-progress :percentage="coverTask.progressPercent || 0" :status="coverTask.status === 'FAILED' ? 'exception' : undefined" />
+        <div class="reader-work-detail__cover-summary">
+          <span>竖版 {{ coverTask.portraitSuccessCount }}/{{ coverTask.portraitTargetCount }}</span>
+          <span>横版 {{ coverTask.landscapeSuccessCount }}/{{ coverTask.landscapeTargetCount }}</span>
+          <span v-if="coverTask.currentProvider">当前来源：{{ coverTask.currentProvider }}</span>
+          <span v-if="coverTask.finishedAt">完成时间：{{ coverTask.finishedAt }}</span>
+        </div>
+        <el-alert v-if="coverTask.lastError" class="mb-3" type="warning" :closable="false" :title="coverTask.lastError" />
+        <div class="reader-work-detail__cover-grid">
+          <div v-for="candidate in coverTask.candidates" :key="candidate.id" class="reader-work-detail__cover-candidate">
+            <img :src="resolveReaderAssetUrl(candidate.storedImageUrl)" :alt="`${candidate.orientation}-${candidate.id}`" />
+            <div class="reader-work-detail__cover-candidate-meta">
+              <strong>{{ candidate.orientation === 'PORTRAIT' ? '竖版' : '横版' }} · {{ candidate.sourceProvider }}</strong>
+              <a v-if="candidate.sourcePageUrl" :href="candidate.sourcePageUrl" target="_blank" rel="noreferrer">查看来源页</a>
+              <span>{{ candidate.capturedAt || '--' }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div v-else class="reader-work-detail__empty">章节采集完成后会自动创建封面采集任务。</div>
+    </el-card>
+
     <el-drawer
       v-model="previewDrawerVisible"
       :title="previewTitle"
@@ -202,20 +240,24 @@
 // 阅读器管理端作品详情页，承接目录预览、正文预览与上下架联动。
 // 详情页需要同时读取详情、目录、预览和上下架动作，所以集中引入后台作品相关接口。
 import {
+  getReaderCoverCrawlTask,
   getReaderComicChapterPreview,
   getReaderNovelChapterPreview,
   getReaderWorkDetail,
   listReaderWorkCatalog,
   offlineReaderWork,
-  publishReaderWork
+  publishReaderWork,
+  retryReaderCoverCrawl
 } from '@/api/reader/admin';
 // 目录、详情和章节预览类型来自共享契约，保证小说/漫画预览切换时字段可控。
 import type {
   ReaderCatalogAdminVO,
   ReaderComicChapterAdminVO,
   ReaderNovelChapterAdminVO,
-  ReaderWorkDetailAdminVO
+  ReaderWorkDetailAdminVO,
+  ReaderCoverCrawlTaskAdminVO
 } from '@/api/reader/admin/types';
+import { resolveReaderAssetUrl } from '@/utils/readerAsset';
 
 defineOptions({ name: 'ReaderAdminWorkDetailPage' });
 
@@ -231,6 +273,9 @@ const novelPreview = ref<ReaderNovelChapterAdminVO>();
 const comicPreview = ref<ReaderComicChapterAdminVO>();
 const previewDrawerVisible = ref(false);
 const previewCardRef = ref();
+const coverTask = ref<ReaderCoverCrawlTaskAdminVO>();
+const coverLoading = ref(false);
+let coverPollTimer: ReturnType<typeof window.setInterval> | undefined;
 
 const workId = computed(() => route.params.workId as string);
 const activeChapterIndex = computed(() =>
@@ -250,6 +295,28 @@ const previewTitle = computed(() => {
 });
 const hasPreviousChapter = computed(() => activeChapterIndex.value > 0);
 const hasNextChapter = computed(() => activeChapterIndex.value > -1 && activeChapterIndex.value < catalog.value.length - 1);
+
+const coverTaskStatusType = (status?: string) => {
+  if (status === 'COMPLETED') return 'success';
+  if (status === 'FAILED') return 'danger';
+  if (status === 'RUNNING') return 'warning';
+  return 'info';
+};
+
+const loadCoverCrawl = async () => {
+  coverLoading.value = true;
+  try {
+    coverTask.value = (await getReaderCoverCrawlTask(workId.value)).data;
+  } finally {
+    coverLoading.value = false;
+  }
+};
+
+const retryCoverCrawl = async () => {
+  await retryReaderCoverCrawl(workId.value);
+  ElMessage.success('封面采集已重新排队');
+  await loadCoverCrawl();
+};
 
 // 把发布状态转换为标签颜色，便于详情区快速识别当前可见状态。
 const getPublishStatusType = (status?: string) => {
@@ -300,9 +367,14 @@ const loadPreview = async (chapterId: string | number) => {
 const loadData = async () => {
   loading.value = true;
   try {
-    const [detailRes, catalogRes] = await Promise.all([getReaderWorkDetail(workId.value), listReaderWorkCatalog(workId.value)]);
+    const [detailRes, catalogRes, coverRes] = await Promise.all([
+      getReaderWorkDetail(workId.value),
+      listReaderWorkCatalog(workId.value),
+      getReaderCoverCrawlTask(workId.value)
+    ]);
     detail.value = detailRes.data;
     catalog.value = catalogRes.data || [];
+    coverTask.value = coverRes.data;
     // 首次进入详情页时优先恢复路由里的章节定位，其次沿用当前选中章节，最后才回落到首章。
     const routeChapterId = route.query.chapterId as string | undefined;
     const nextChapterId = routeChapterId || activeChapterId.value || catalog.value[0]?.chapterId;
@@ -360,6 +432,13 @@ const handleOffline = async () => {
 // 进入详情页后立即拉取当前作品的详情、目录和首章预览。
 onMounted(() => {
   loadData();
+  coverPollTimer = window.setInterval(() => {
+    if (coverTask.value?.status === 'PENDING' || coverTask.value?.status === 'RUNNING') loadCoverCrawl();
+  }, 10000);
+});
+
+onUnmounted(() => {
+  if (coverPollTimer) window.clearInterval(coverPollTimer);
 });
 </script>
 
@@ -377,8 +456,47 @@ onMounted(() => {
 }
 
 .reader-work-detail__catalog-card,
-.reader-work-detail__preview-card {
+.reader-work-detail__preview-card,
+.reader-work-detail__cover-card {
   margin-bottom: 0;
+}
+
+.reader-work-detail__cover-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin: 12px 0 16px;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.reader-work-detail__cover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.reader-work-detail__cover-candidate {
+  overflow: hidden;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-bg-color-page);
+}
+
+.reader-work-detail__cover-candidate img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+  background: #f8f5ef;
+}
+
+.reader-work-detail__cover-candidate-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  font-size: 12px;
 }
 
 .reader-work-detail__catalog-toolbar {

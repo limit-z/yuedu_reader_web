@@ -45,10 +45,12 @@
             <p class="m-0 mt-1 text-sm text-[var(--el-text-color-secondary)]">当前共 {{ total }} 条反馈记录。</p>
           </div>
           <right-toolbar v-model:show-search="showSearch" :search="false" @query-table="getList" />
+          <el-dropdown @command="handleBatchStatus"><el-button :disabled="!selectedFeedback.length">批量改状态<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button><template #dropdown><el-dropdown-menu><el-dropdown-item command="PENDING">批量待处理</el-dropdown-item><el-dropdown-item command="PROCESSING">批量处理中</el-dropdown-item><el-dropdown-item command="REPLIED">批量已回复</el-dropdown-item><el-dropdown-item command="DONE">批量已完成</el-dropdown-item></el-dropdown-menu></template></el-dropdown>
         </div>
       </template>
 
-      <el-table v-loading="loading" :data="feedbackList" border>
+      <el-table v-loading="loading" :data="feedbackList" border @selection-change="value => selectedFeedback = value">
+        <el-table-column type="selection" width="48" />
         <el-table-column label="反馈ID" prop="feedbackId" width="100" />
         <el-table-column label="身份" min-width="120">
           <template #default="{ row }">
@@ -141,7 +143,7 @@
 // 表单实例类型用于查询表单与回复弹窗表单的校验调用。
 import type { FormInstance, FormRules } from 'element-plus';
 // 反馈工单接口统一从阅读器后台 API 模块引入，保证页面和后端契约一致。
-import { listReaderFeedback, replyReaderFeedback, updateReaderFeedbackStatus } from '@/api/reader/admin';
+import { batchUpdateReaderFeedbackStatus, listReaderFeedback, replyReaderFeedback, updateReaderFeedbackStatus } from '@/api/reader/admin';
 // 反馈工单相关类型统一走共享定义，避免页面硬编码字段结构。
 import type {
   ReaderFeedbackAdminQuery,
@@ -157,6 +159,7 @@ const loading = ref(false);
 const showSearch = ref(true);
 const total = ref(0);
 const feedbackList = ref<ReaderFeedbackAdminVO[]>([]);
+const selectedFeedback = ref<ReaderFeedbackAdminVO[]>([]);
 const replyDialogVisible = ref(false);
 const replySubmitting = ref(false);
 const currentFeedback = ref<ReaderFeedbackAdminVO>();
@@ -252,6 +255,15 @@ const handleStatusChange = async (row: ReaderFeedbackAdminVO, status: string) =>
   await updateReaderFeedbackStatus(row.feedbackId, { status });
   ElMessage.success(`工单状态已更新为 ${status}`);
   getList();
+};
+
+const handleBatchStatus = async (status: string) => {
+  if (!selectedFeedback.value.length) return ElMessage.warning('请先选择反馈工单');
+  await ElMessageBox.confirm(`确认批量更新 ${selectedFeedback.value.length} 条工单状态吗？`, '批量操作确认', { type: 'warning' });
+  const { data } = await batchUpdateReaderFeedbackStatus(selectedFeedback.value.map(row => row.feedbackId), status);
+  ElMessage.success(`批量更新完成，成功 ${data?.successCount ?? 0} 条，失败 ${data?.failureCount ?? 0} 条`);
+  await getList();
+  selectedFeedback.value = [];
 };
 
 // 页面初始化时先拉一次反馈工单列表，方便后台直接进入处理工作台。

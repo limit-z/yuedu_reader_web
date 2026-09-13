@@ -11,7 +11,7 @@ const readerAdminRoutes: RouteRecordRaw[] = [
     name: 'ReaderAdmin',
     redirect: '/reader-admin/work',
     // 本地补充路由会先经过权限过滤，目录节点需要挂一组可命中的权限才能被真正注入。
-    permissions: ['reader:work:list', 'reader:import-task:list', 'reader:audit:list', 'reader:feedback:list', 'reader:publish-log:list', 'reader:source:list'],
+    permissions: ['reader:work:list', 'reader:import-task:list', 'reader:audit:list', 'reader:feedback:list', 'reader:publish-log:list', 'reader:source:list', 'reader:category:list'],
     alwaysShow: true,
     meta: { title: '阅读器管理', icon: 'document' },
     children: [
@@ -58,6 +58,27 @@ const readerAdminRoutes: RouteRecordRaw[] = [
         component: () => import('@/views/reader-admin/source-center/index.vue'),
         permissions: ['reader:source:list'],
         meta: { title: '书源采集中心', icon: 'connection' }
+      },
+      {
+        path: 'source-dashboard',
+        name: 'ReaderAdminSourceDashboard',
+        component: () => import('@/views/reader-admin/source-dashboard/index.vue'),
+        permissions: ['reader:source:list'],
+        meta: { title: '采集数据大盘', icon: 'data-analysis' }
+      },
+      {
+        path: 'work-category',
+        name: 'ReaderAdminWorkCategory',
+        component: () => import('@/views/reader-admin/work-category/index.vue'),
+        permissions: ['reader:category:list'],
+        meta: { title: '作品分类', icon: 'collection-tag' }
+      },
+      {
+        path: 'ranking',
+        name: 'ReaderAdminRanking',
+        component: () => import('@/views/reader-admin/ranking/index.vue'),
+        permissions: ['reader:ranking:list'],
+        meta: { title: '榜单管理', icon: 'trend-charts' }
       }
     ]
   }
