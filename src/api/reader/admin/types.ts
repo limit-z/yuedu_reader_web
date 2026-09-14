@@ -320,6 +320,53 @@ export interface ReaderFeedbackStatusForm {
   status: string;
 }
 
+export interface ReaderUserAdminVO {
+  accountId: string | number;
+  nickName?: string;
+  gender?: string;
+  region?: string;
+  status: string;
+  lastClientType?: string;
+  lastLoginAt?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface ReaderUserAdminQuery extends PageQuery {
+  keyword?: string;
+  status?: string;
+  lastClientType?: string;
+}
+
+export interface ReaderReadingCommentAdminVO {
+  id: string | number;
+  readerId: string | number;
+  accountType: string;
+  workId?: string | number;
+  workTitle?: string;
+  chapterId?: string | number;
+  quoteText?: string;
+  commentContent: string;
+  score?: number;
+  likeCount?: number;
+  status: string;
+  nickName?: string;
+  createTime?: string;
+  updateTime?: string;
+}
+
+export interface ReaderReadingCommentAdminQuery extends PageQuery {
+  keyword?: string;
+  status?: string;
+  workId?: string | number;
+}
+
+export interface ReaderPointsRuleAdminVO {
+  storage: string;
+  tasks: Array<{ key: string; title: string; points: number; condition: string }>;
+  rewards: Array<{ title: string; points: number; condition: string }>;
+}
+
 export interface ReaderSourceSite extends BaseEntity {
   id: string | number;
   siteName: string;

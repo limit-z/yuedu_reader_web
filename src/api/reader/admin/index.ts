@@ -54,6 +54,11 @@ import type {
   ,ReaderRanking
   ,ReaderRankingWork
   ,ReaderRankingWorkOption
+  ,ReaderUserAdminQuery
+  ,ReaderUserAdminVO
+  ,ReaderReadingCommentAdminQuery
+  ,ReaderReadingCommentAdminVO
+  ,ReaderPointsRuleAdminVO
 } from './types';
 // 分页壳类型复用平台通用定义，避免各业务模块重复声明。
 import type { PageResult } from '@/api/types';
@@ -204,6 +209,27 @@ export const updateReaderFeedbackStatus = (feedbackId: string | number, data: Re
 
 export const batchUpdateReaderFeedbackStatus = (ids: Array<string | number>, status: string): AxiosPromise<ReaderBatchActionResult> =>
   request({ url: '/reader/admin/feedback/batch/status', method: 'post', data: { ids, status } });
+
+export const listReaderH5Users = (query: ReaderUserAdminQuery): AxiosPromise<PageResult<ReaderUserAdminVO>> =>
+  request({ url: '/reader/admin/h5/users/list', method: 'get', params: query });
+
+export const updateReaderH5UserStatus = (id: string | number, status: string) =>
+  request({ url: `/reader/admin/h5/users/${id}/status/${status}`, method: 'post' });
+
+export const batchUpdateReaderH5UserStatus = (ids: Array<string | number>, status: string): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: '/reader/admin/h5/users/batch/status', method: 'post', data: { ids, status } });
+
+export const listReaderH5Comments = (query: ReaderReadingCommentAdminQuery): AxiosPromise<PageResult<ReaderReadingCommentAdminVO>> =>
+  request({ url: '/reader/admin/h5/comments/list', method: 'get', params: query });
+
+export const updateReaderH5CommentStatus = (id: string | number, status: string) =>
+  request({ url: `/reader/admin/h5/comments/${id}/status/${status}`, method: 'post' });
+
+export const batchUpdateReaderH5CommentStatus = (ids: Array<string | number>, status: string): AxiosPromise<ReaderBatchActionResult> =>
+  request({ url: '/reader/admin/h5/comments/batch/status', method: 'post', data: { ids, status } });
+
+export const getReaderH5PointsRules = (): AxiosPromise<ReaderPointsRuleAdminVO> =>
+  request({ url: '/reader/admin/h5/points/rules', method: 'get' });
 
 export const listReaderSourceSites = (query: Record<string, unknown>): AxiosPromise<PageResult<ReaderSourceSite>> =>
   request({ url: '/reader/admin/source/sites/list', method: 'get', params: query });

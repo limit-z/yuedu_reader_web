@@ -305,7 +305,7 @@ const resetQuery = () => {
 
 // 跳转到作品详情页，进入目录预览与章节预览工作流。
 const handleDetail = (row: ReaderWorkAdminVO) => {
-  router.push(`/reader-admin/work/${row.id}`);
+  router.push(`/reader-admin/works/list/${row.id}`);
 };
 
 const loadGlobalCoverStyle = async () => {
